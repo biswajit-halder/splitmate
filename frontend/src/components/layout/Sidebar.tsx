@@ -11,7 +11,7 @@ const navItems = [
 
 export function Sidebar() {
   return (
-    <aside className="hidden lg:flex w-70 flex-col border-r border-outline-variant bg-surface p-lg">
+    <aside className="hidden lg:flex w-64 flex-col border-r border-outline-variant bg-surface p-lg">
       <div className="mb-xl flex items-center gap-3">
         <span className="material-symbols-outlined text-primary-container text-2xl">account_balance</span>
         <div>
