@@ -5,15 +5,16 @@ import { TopBar } from './TopBar'
 
 export function Layout() {
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
       <Sidebar />
-      <div className="flex flex-1 flex-col">
+      <main className="lg:ml-sidebar min-h-screen flex flex-col">
         <TopBar />
-        <main className="flex-1 p-lg pb-24 lg:pb-lg">
+        <div className="flex-1 px-md md:px-xxl pt-24 pb-xxl overflow-y-auto w-full max-w-content mx-auto">
           <Outlet />
-        </main>
-      </div>
+        </div>
+      </main>
       <BottomNav />
     </div>
   )
 }
+

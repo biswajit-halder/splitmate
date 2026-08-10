@@ -2,41 +2,37 @@ import { Link } from 'react-router-dom'
 
 export function TopBar() {
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-outline-variant bg-surface/80 px-lg backdrop-blur-md">
-      <div className="flex items-center gap-4 lg:hidden">
-        <span className="material-symbols-outlined text-primary-container">account_balance</span>
-        <span className="font-headline-sm text-headline-sm text-on-surface">SplitMate</span>
-      </div>
-      
-      <div className="hidden lg:block">
-        <SearchBar />
-      </div>
-      
-      <div className="flex items-center gap-4">
-        <button className="relative rounded-full p-2 hover:bg-surface-container-high">
-          <span className="material-symbols-outlined text-on-surface-variant">notifications</span>
-        </button>
-        <Link to="/profile">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-outline-variant font-label-md text-label-md text-on-surface-variant">
-            A
+    <header className="fixed top-0 w-full lg:w-main z-50 glass-panel shadow-sm">
+      <div className="flex justify-between items-center h-16 px-md md:px-xxl w-full">
+        <div className="lg:hidden flex items-center gap-sm">
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary font-bold text-label-md">
+            S
           </div>
-        </Link>
+          <span className="font-headline-md text-headline-md font-bold text-primary">SplitMate</span>
+        </div>
+
+        <div className="hidden md:flex items-center flex-1 max-w-md relative">
+          <span className="material-symbols-outlined absolute left-4 text-on-surface-variant">search</span>
+          <input
+            type="text"
+            placeholder="Search friends, groups, or expenses..."
+            className="w-full h-12 pl-12 pr-4 rounded-xl border border-outline-variant bg-surface-container-lowest focus:ring-2 focus:ring-primary/20 focus:border-primary font-body-md text-body-md placeholder:text-on-surface-variant outline-none transition-all"
+          />
+        </div>
+
+        <div className="flex items-center gap-md ml-auto">
+          <button className="relative p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-colors">
+            <span className="material-symbols-outlined">notifications</span>
+            <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+          </button>
+          <Link to="/profile">
+            <div className="w-10 h-10 rounded-full overflow-hidden border border-outline-variant/30 cursor-pointer bg-primary flex items-center justify-center text-on-primary font-bold text-label-md">
+              A
+            </div>
+          </Link>
+        </div>
       </div>
     </header>
   )
 }
 
-function SearchBar() {
-  return (
-    <div className="relative w-80">
-      <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">
-        search
-      </span>
-      <input
-        type="search"
-        placeholder="Search..."
-        className="h-10 w-full rounded-md border border-outline bg-surface-container-low pl-12 pr-4 font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:border-2 focus:border-primary focus:outline-none"
-      />
-    </div>
-  )
-}

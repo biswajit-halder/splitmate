@@ -13,6 +13,7 @@ import { AnalyticsPage } from './pages/Analytics'
 import { SettingsPage } from './pages/Settings'
 import { ProfilePage } from './pages/Profile'
 import { NotificationsPage } from './pages/Notifications'
+import { ActivityPage } from './pages/Activity'
 
 function App() {
   return (
@@ -26,7 +27,7 @@ function App() {
             <Route path="/groups" element={<GroupsPage />} />
             <Route path="/groups/:id" element={<GroupDetailPage />} />
             <Route path="/friends" element={<FriendsPage />} />
-            <Route path="/activity" element={<div className="p-8"><h1 className="font-headline-lg text-headline-lg text-on-surface">Activity</h1></div>} />
+            <Route path="/activity" element={<ActivityPage />} />
             <Route path="/settlements" element={<SettlementsPage />} />
             <Route path="/settlements/confirm" element={<div className="p-8"><h1 className="font-headline-lg text-headline-lg text-on-surface">Confirm Settlement</h1></div>} />
             <Route path="/expenses/add" element={<AddExpensePage />} />
