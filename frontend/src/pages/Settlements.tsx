@@ -1,233 +1,183 @@
-import { useState } from 'react'
-import { Card, Avatar, Badge, Button } from '../components/ui'
-
-const settlementData = [
-  { date: 'Nov 12, 2023', name: 'Alex Lee', initials: 'AL', method: 'Bank Transfer', methodIcon: 'account_balance', amount: 85.00, status: 'Pending', note: 'Dinner Split' },
-  { date: 'Nov 10, 2023', name: 'David Cho', initials: 'DC', method: 'Venmo', methodIcon: 'smartphone', amount: -150.00, status: 'Completed', note: 'Concert Tickets' },
-  { date: 'Nov 05, 2023', name: 'Sarah Jenkins', initials: 'SJ', method: 'Card ending 4242', methodIcon: 'credit_card', amount: 42.75, status: 'Completed', note: 'Groceries' },
-]
-
-const suggestions = [
-  { name: 'Pay Sarah Jenkins', initials: 'SJ', amount: 120.00, note: "Clears 3 expenses in 'Trip'" },
-  { name: 'Pay Marcus K.', initials: 'MK', amount: 45.50, note: "Clears balance in 'Flatmates'" },
-]
-
-const paymentFlow = [
-  { title: 'Payment Initiated', time: 'Today, 10:42 AM', desc: 'You initiated a $85.00 transfer to Alex Lee via Bank Transfer.', icon: 'send', completed: true },
-  { title: 'Funds Received', time: 'Nov 10', desc: 'David Cho confirmed receipt of $150.00 for Concert Tickets.', icon: 'check_circle', completed: true, receipt: 'Receipt #492-AX' },
-  { title: 'Auto-Settled', time: 'Nov 02', desc: 'Monthly balance of $210.00 settled automatically from wallet.', icon: 'check', completed: true },
-]
-
-const chartData = [
-  { month: 'Jul', value: 45 },
-  { month: 'Aug', value: 120 },
-  { month: 'Sep', value: 30 },
-  { month: 'Oct', value: 180 },
-  { month: 'Nov', value: 95 },
-]
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useApi, useMutation } from '../hooks/useApi'
+import { groupsApi } from '../lib/api/groups'
+import { settlementsApi } from '../lib/api/settlements'
+import { formatMoney, toPaise } from '../lib/money'
+import { Modal, Button, Skeleton, Badge } from '../components/ui'
+import { useToast } from '../components/ui'
+import { useAuth } from '../context/AuthContext'
 
 export function SettlementsPage() {
-  const [timeFilter, setTimeFilter] = useState<'all' | 'month'>('all')
-  const maxVal = Math.max(...chartData.map(d => d.value))
+  const { user } = useAuth()
+  const { addToast } = useToast()
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const groups = useApi(() => groupsApi.list())
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('')
+  const [newOpen, setNewOpen] = useState(false)
+  const [memberId, setMemberId] = useState('')
+  const [amount, setAmount] = useState('')
+
+  useEffect(() => {
+    if (params.get('new') === '1') {
+      setNewOpen(true)
+      navigate('/settlements', { replace: true })
+    }
+  }, [params, navigate])
+
+  const selectedGroup = useMemo(
+    () => (groups.data ?? []).find(g => g.id === selectedGroupId),
+    [groups.data, selectedGroupId],
+  )
+  const groupDetail = useApi(
+    () => (selectedGroupId ? groupsApi.get(selectedGroupId) : Promise.resolve(null)),
+    [selectedGroupId],
+  )
+
+  const settlements = useApi(
+    () => (selectedGroupId ? settlementsApi.list(selectedGroupId, selectedGroup?.name) : Promise.resolve([])),
+    [selectedGroupId, selectedGroup?.name],
+  )
+
+  const create = useMutation((body: { payerId: string; payeeId: string; amountPaise: number }) =>
+    settlementsApi.create(selectedGroupId, body),
+  )
+  const confirm = useMutation((id: string) => settlementsApi.confirm(id))
+  const remove = useMutation((id: string) => settlementsApi.remove(id))
+
+  const members = groupDetail.data?.members ?? []
+
+  const handleCreate = async () => {
+    if (!memberId || !amount) return
+    try {
+      await create.mutate({ payerId: user?.id ?? '', payeeId: memberId, amountPaise: toPaise(amount) })
+      addToast('Settlement recorded', 'success')
+      setNewOpen(false)
+      setMemberId('')
+      setAmount('')
+      settlements.refetch()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed', 'error' as never)
+    }
+  }
+
+  const handleConfirm = async (id: string) => {
+    try {
+      await confirm.mutate(id)
+      addToast('Settlement confirmed', 'success')
+      settlements.refetch()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed', 'error' as never)
+    }
+  }
+
+  const handleRemove = async (id: string) => {
+    try {
+      await remove.mutate(id)
+      settlements.refetch()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed', 'error' as never)
+    }
+  }
+
+  const list = settlements.data ?? []
 
   return (
-    <div className="flex flex-col gap-xl">
-      {/* Header */}
-      <div>
-        <h1 className="font-headline-lg text-headline-lg text-on-surface">Settlements</h1>
-        <p className="font-body-md text-body-md text-on-surface-variant mt-xs">
-          Review outstanding balances, clear debts efficiently, and track your recent financial resolutions across all groups.
-        </p>
+    <div className="flex flex-col gap-xl max-w-content">
+      <div className="flex items-start justify-between flex-wrap gap-md">
+        <div>
+          <h2 className="font-headline-lg md:font-headline-xl text-headline-lg md:text-headline-xl text-on-surface">Settlements</h2>
+          <p className="font-body-md text-body-md text-on-surface-variant mt-xs">Track and confirm payments between members.</p>
+        </div>
+        <Button onClick={() => setNewOpen(true)} disabled={!selectedGroupId}>
+          <span className="material-symbols-outlined text-[18px]">add</span> New Settlement
+        </Button>
       </div>
 
-      {/* Filter Bar */}
-      <div className="flex items-center justify-between flex-wrap gap-md">
-        <div className="flex bg-surface-container rounded-lg p-1">
-          <button
-            onClick={() => setTimeFilter('all')}
-            className={`px-md py-2 rounded font-label-md text-label-md transition-colors ${timeFilter === 'all' ? 'bg-surface shadow-sm text-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
-          >
-            All Time
-          </button>
-          <button
-            onClick={() => setTimeFilter('month')}
-            className={`px-md py-2 rounded font-label-md text-label-md transition-colors ${timeFilter === 'month' ? 'bg-surface shadow-sm text-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
-          >
-            This Month
-          </button>
-        </div>
-        <div className="flex items-center gap-sm">
-          <button className="flex items-center gap-xs px-md py-2 rounded-lg border border-outline-variant text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors">
-            <span className="material-symbols-outlined text-[18px]">filter_list</span>
-            Filter
-          </button>
-          <button className="flex items-center gap-xs px-md py-2 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 transition-opacity">
-            <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
-            Settle Up
-          </button>
-        </div>
+      <div className="flex flex-col gap-xs">
+        <label className="font-label-sm text-label-sm text-on-surface-variant">Group</label>
+        <select
+          value={selectedGroupId}
+          onChange={e => setSelectedGroupId(e.target.value)}
+          className="w-full sm:w-80 h-12 px-md rounded-lg border border-outline-variant bg-surface"
+        >
+          <option value="">Select a group</option>
+          {(groups.data ?? []).map(g => (
+            <option key={g.id} value={g.id}>{g.name}</option>
+          ))}
+        </select>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-lg md:grid-cols-2">
-        <Card>
-          <div className="flex items-center gap-md mb-md">
-            <div className="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center">
-              <span className="material-symbols-outlined text-error">trending_down</span>
+      {settlements.loading && <Skeleton height={120} />}
+
+      <div className="flex flex-col gap-md">
+        {list.map(s => (
+          <div key={s.id} className="bg-surface rounded-xl border border-outline-variant/20 p-lg flex items-center justify-between">
+            <div className="flex items-center gap-md">
+              <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-success">payments</span>
+              </div>
+              <div>
+                <p className="font-label-md text-label-md text-on-surface">{s.fromName} → {s.toName}</p>
+                <p className="font-body-sm text-body-sm text-on-surface-variant">{s.date}</p>
+              </div>
             </div>
-            <h3 className="font-label-md text-label-md text-on-surface-variant">Outstanding</h3>
-          </div>
-          <p className="font-headline-md text-headline-md text-on-surface">$342.50</p>
-          <div className="flex items-center gap-xs mt-xs">
-            <p className="font-label-sm text-label-sm text-error">Total You Owe</p>
-          </div>
-          <div className="flex items-center gap-xs mt-sm">
-            <span className="material-symbols-outlined text-[14px] text-error">arrow_upward</span>
-            <span className="font-body-sm text-body-sm text-error">12% from last month</span>
-          </div>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-md mb-md">
-            <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center">
-              <span className="material-symbols-outlined text-success">trending_up</span>
+            <div className="flex items-center gap-md">
+              <span className="font-label-md text-label-md text-on-surface">{formatMoney(s.amountPaise)}</span>
+              <Badge variant={s.status === 'confirmed' ? 'success' : s.status === 'pending' ? 'warning' : 'danger'}>{s.status}</Badge>
+              {s.status === 'pending' && s.toUserId === user?.id && (
+                <Button onClick={() => handleConfirm(s.id)}>Confirm</Button>
+              )}
+              {s.status !== 'confirmed' && (
+                <Button variant="ghost" onClick={() => handleRemove(s.id)}>Remove</Button>
+              )}
             </div>
-            <h3 className="font-label-md text-label-md text-on-surface-variant">To Receive</h3>
           </div>
-          <p className="font-headline-md text-headline-md text-on-surface">$197.00</p>
-          <div className="flex items-center gap-xs mt-xs">
-            <p className="font-label-sm text-label-sm text-success">Total Owed to You</p>
+        ))}
+        {!settlements.loading && selectedGroupId && list.length === 0 && (
+          <div className="bg-surface rounded-xl border border-outline-outline-variant p-xl text-center">
+            <p className="font-headline-sm text-headline-sm text-on-surface">No settlements yet</p>
           </div>
-          <div className="flex items-center gap-xs mt-sm">
-            <span className="material-symbols-outlined text-[14px] text-success">arrow_downward</span>
-            <span className="font-body-sm text-body-sm text-success">4% from last month</span>
-          </div>
-        </Card>
+        )}
+        {!selectedGroupId && !settlements.loading && (
+          <p className="font-body-sm text-body-sm text-on-surface-variant">Select a group to view settlements.</p>
+        )}
       </div>
 
-      {/* Settlement Volume Chart */}
-      <Card>
-        <div className="flex items-center justify-between mb-lg">
-          <h3 className="font-headline-sm text-headline-sm text-on-surface">Settlement Volume</h3>
-          <button className="text-on-surface-variant hover:text-on-surface transition-colors">
-            <span className="material-symbols-outlined">more_horiz</span>
-          </button>
-        </div>
-        <div className="flex items-end gap-lg h-48">
-          {chartData.map((d) => (
-            <div key={d.month} className="flex-1 flex flex-col items-center gap-xs">
-              <span className="font-label-sm text-label-sm text-on-surface-variant">${d.value}</span>
-              <div
-                className="w-full bg-primary/20 rounded-t-md transition-all duration-500"
-                style={{ height: `${(d.value / maxVal) * 120}px` }}
+      <Modal isOpen={newOpen} onClose={() => setNewOpen(false)} title="New Settlement">
+        <div className="flex flex-col gap-lg">
+          <div className="flex flex-col gap-xs">
+            <label className="font-label-sm text-label-sm text-on-surface-variant">Pay to</label>
+            <select
+              value={memberId}
+              onChange={e => setMemberId(e.target.value)}
+              className="w-full h-12 px-md rounded-lg border border-outline-variant bg-surface"
+            >
+              <option value="">Select a member</option>
+              {members.filter(m => m.userId !== user?.id).map(m => (
+                <option key={m.userId} value={m.userId}>{m.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-xs">
+            <label className="font-label-sm text-label-sm text-on-surface-variant">Amount</label>
+            <div className="flex items-center gap-md px-md rounded-lg border border-outline-variant bg-surface">
+              <span className="text-outline">₹</span>
+              <input
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                inputMode="decimal"
+                className="w-full h-12 bg-transparent text-on-surface font-body-md text-body-md outline-none"
               />
-              <span className="font-label-sm text-label-sm text-on-surface-variant">{d.month}</span>
             </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Smart Suggestions */}
-      <Card>
-        <div className="flex items-center gap-md mb-lg">
-          <span className="material-symbols-outlined text-primary">lightbulb</span>
-          <h3 className="font-headline-sm text-headline-sm text-on-surface">Smart Suggestions</h3>
-        </div>
-        <div className="flex flex-col gap-md">
-          {suggestions.map((s, i) => (
-            <div key={i} className="flex items-center justify-between p-md rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors">
-              <div className="flex items-center gap-md">
-                <Avatar initials={s.initials} />
-                <div>
-                  <p className="font-label-md text-label-md text-on-surface">{s.name}</p>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">{s.note}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-md">
-                <span className="font-label-md text-label-md text-on-surface">${s.amount.toFixed(2)}</span>
-                <Button className="px-md py-2 text-sm">Settle</Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Recent Settlements */}
-      <Card>
-        <div className="flex items-center justify-between mb-lg">
-          <h3 className="font-headline-sm text-headline-sm text-on-surface">Recent Settlements</h3>
-          <button className="font-label-md text-label-md text-primary hover:text-primary/80 transition-colors">View All</button>
-        </div>
-        {/* Table Header */}
-        <div className="hidden md:grid md:grid-cols-5 gap-md px-md pb-sm border-b border-outline-variant/30">
-          <span className="font-label-sm text-label-sm text-on-surface-variant">Date</span>
-          <span className="font-label-sm text-label-sm text-on-surface-variant">Recipient / Sender</span>
-          <span className="font-label-sm text-label-sm text-on-surface-variant">Method</span>
-          <span className="font-label-sm text-label-sm text-on-surface-variant text-right">Amount</span>
-          <span className="font-label-sm text-label-sm text-on-surface-variant text-right">Status</span>
-        </div>
-        {/* Rows */}
-        <div className="flex flex-col">
-          {settlementData.map((s, i) => (
-            <div key={i} className="grid grid-cols-1 md:grid-cols-5 gap-md items-center p-md rounded-lg hover:bg-surface-container-low transition-colors border-b border-outline-variant/10 last:border-b-0">
-              <span className="font-body-sm text-body-sm text-on-surface-variant">{s.date}</span>
-              <div className="flex items-center gap-md">
-                <Avatar initials={s.initials} size="sm" />
-                <div>
-                  <p className="font-label-md text-label-md text-on-surface">{s.name}</p>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">{s.note}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-xs">
-                <span className="material-symbols-outlined text-[16px] text-on-surface-variant">{s.methodIcon}</span>
-                <span className="font-body-sm text-body-sm text-on-surface-variant">{s.method}</span>
-              </div>
-              <span className={`font-label-md text-label-md text-right ${s.amount > 0 ? 'text-error' : 'text-success'}`}>
-                {s.amount > 0 ? '-' : '+'}${Math.abs(s.amount).toFixed(2)}
-              </span>
-              <div className="flex items-center justify-end gap-sm">
-                <Badge variant={s.status === 'Completed' ? 'success' : 'warning'}>{s.status}</Badge>
-                {s.status === 'Pending' && (
-                  <button className="font-label-sm text-label-sm text-primary hover:text-primary/80 transition-colors">Mark Paid</button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Payment Flow */}
-      <Card>
-        <h3 className="font-headline-sm text-headline-sm text-on-surface mb-lg">Payment Flow</h3>
-        <div className="relative">
-          {/* Vertical line */}
-          <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-outline-variant/30" />
-          <div className="flex flex-col gap-xl">
-            {paymentFlow.map((item, i) => (
-              <div key={i} className="flex gap-lg relative">
-                <div className="w-10 h-10 rounded-full bg-success flex items-center justify-center z-10 shrink-0">
-                  <span className="material-symbols-outlined text-on-success text-[18px]">{item.icon}</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-sm">
-                    <h4 className="font-label-md text-label-md text-on-surface">{item.title}</h4>
-                    <span className="font-body-sm text-body-sm text-on-surface-variant">{item.time}</span>
-                  </div>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant mt-xs">{item.desc}</p>
-                  {item.receipt && (
-                    <div className="flex items-center gap-xs mt-xs">
-                      <span className="material-symbols-outlined text-[14px] text-on-surface-variant">receipt_long</span>
-                      <span className="font-body-sm text-body-sm text-on-surface-variant">{item.receipt}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+          </div>
+          <div className="flex justify-end gap-md">
+            <Button variant="secondary" onClick={() => setNewOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreate} disabled={create.loading || !memberId}>Record</Button>
           </div>
         </div>
-        <div className="mt-lg text-center">
-          <button className="font-label-md text-label-md text-primary hover:text-primary/80 transition-colors">View Full History</button>
-        </div>
-      </Card>
+      </Modal>
     </div>
   )
 }

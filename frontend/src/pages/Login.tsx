@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import { authApi } from '../lib/api/auth'
+import { ApiError } from '../lib/api/client'
+import { useToast } from '../components/ui'
 
 const DEMO_USER = {
   email: 'demo@splitmate.app',
@@ -20,6 +24,8 @@ function GoogleIcon() {
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const { setSession } = useAuth()
+  const { addToast } = useToast()
   const [email, setEmail] = useState(DEMO_USER.email)
   const [password, setPassword] = useState(DEMO_USER.password)
   const [showPassword, setShowPassword] = useState(false)
@@ -27,20 +33,23 @@ export function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-
-    window.setTimeout(() => {
-      if (email.trim() === '' || password.trim() === '') {
-        setError('Please enter your email and password.')
-        setLoading(false)
-        return
+    try {
+      const res = await authApi.login({ email, password })
+      setSession(res.token, res.user)
+      addToast(`Welcome back, ${res.user.name}`, 'success')
+      navigate('/dashboard')
+    } catch (err) {
+      if (err instanceof ApiError && err.details) {
+        setError(err.details.email ?? err.details.password ?? err.message)
+      } else {
+        setError(err instanceof Error ? err.message : 'Login failed')
       }
       setLoading(false)
-      navigate('/dashboard')
-    }, 400)
+    }
   }
 
   return (

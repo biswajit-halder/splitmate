@@ -6,6 +6,10 @@ dist
 .env
 .env.local
 
+# Backend secrets
+backend/.dev.vars*
+
+
 
 # AI
 .omo

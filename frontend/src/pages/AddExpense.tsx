@@ -1,245 +1,178 @@
-import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useApi, useMutation } from '../hooks/useApi'
+import { groupsApi } from '../lib/api/groups'
+import { expensesApi } from '../lib/api/expenses'
+import { toPaise } from '../lib/money'
+import { Button } from '../components/ui'
+import { useToast } from '../components/ui'
+import { useAuth } from '../context/AuthContext'
 
-type SplitMode = 'equally' | 'exact' | 'percent'
-type ParticipantKey = 'you' | 'alex' | 'sam'
+type SplitMode = 'equally' | 'exact'
 
-interface Participant {
-  key: ParticipantKey
-  name: string
-  initials: string
-  avatarBg: string
-  avatarTextColor: string
-  amount: string
-  included: boolean
-}
-
-const initialParticipants: Participant[] = [
-  { key: 'you', name: 'You', initials: 'YO', avatarBg: 'bg-primary-container', avatarTextColor: 'text-on-primary', amount: '$25.00', included: true },
-  { key: 'alex', name: 'Alex L.', initials: 'AL', avatarBg: 'bg-secondary-container', avatarTextColor: 'text-on-secondary-container', amount: '$25.00', included: true },
-  { key: 'sam', name: 'Sam R.', initials: 'SR', avatarBg: 'bg-tertiary-container', avatarTextColor: 'text-on-tertiary-container', amount: '--', included: false },
-]
+const CATEGORIES = ['Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Other']
 
 export function AddExpensePage() {
   const navigate = useNavigate()
-  const [mounted, setMounted] = useState(false)
-  const [amount, setAmount] = useState('')
+  const { user } = useAuth()
+  const { addToast } = useToast()
+  const [params] = useSearchParams()
+  const groups = useApi(() => groupsApi.list())
+
+  const [groupId, setGroupId] = useState(params.get('group') ?? '')
   const [description, setDescription] = useState('')
-  const [date, setDate] = useState('2026-08-08')
+  const [amount, setAmount] = useState('')
+  const [category, setCategory] = useState('Food')
+  const [paidBy, setPaidBy] = useState(user?.id ?? '')
   const [splitMode, setSplitMode] = useState<SplitMode>('equally')
-  const [participants, setParticipants] = useState<Participant[]>(initialParticipants)
+  const [exact, setExact] = useState<Record<string, string>>({})
 
-  useEffect(() => setMounted(true), [])
+  const groupDetail = useApi(
+    () => (groupId ? groupsApi.get(groupId) : Promise.resolve(null)),
+    [groupId],
+  )
+  const members = groupDetail.data?.members ?? []
 
-  const toggleParticipant = (key: ParticipantKey) => {
-    setParticipants(prev =>
-      prev.map(p => (p.key === key ? { ...p, included: !p.included, amount: !p.included ? '$25.00' : '--' } : p))
-    )
-  }
+  const create = useMutation((body: Parameters<typeof expensesApi.create>[1]) =>
+    expensesApi.create(groupId, body),
+  )
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    navigate('/dashboard')
+    if (!groupId || !description || !amount) {
+      addToast('Fill in group, description and amount', 'error' as never)
+      return
+    }
+    const amountPaise = toPaise(amount)
+    if (amountPaise <= 0) {
+      addToast('Enter a valid amount', 'error' as never)
+      return
+    }
+
+    let participants: { userId: string; amountPaise?: number }[]
+    if (splitMode === 'equally') {
+      participants = members.map(m => ({ userId: m.userId }))
+    } else {
+      participants = members.map(m => ({ userId: m.userId, amountPaise: toPaise(exact[m.userId] ?? '0') }))
+      const sum = participants.reduce((s, p) => s + (p.amountPaise ?? 0), 0)
+      if (sum !== amountPaise) {
+        addToast('Exact splits must sum to the total', 'error' as never)
+        return
+      }
+    }
+
+    try {
+      await create.mutate({
+        description,
+        amountPaise,
+        paidBy: paidBy || user?.id || '',
+        splitMode,
+        participants,
+        category,
+      })
+      addToast('Expense added', 'success')
+      navigate(`/groups/${groupId}`)
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to add expense', 'error' as never)
+    }
   }
 
-  const close = () => navigate('/dashboard')
+  return (
+    <div className="flex flex-col gap-xl max-w-content">
+      <div>
+        <h2 className="font-headline-lg md:font-headline-xl text-headline-lg md:text-headline-xl text-on-surface">Add Expense</h2>
+        <p className="font-body-md text-body-md text-on-surface-variant mt-xs">Record a shared expense.</p>
+      </div>
 
-  if (!mounted) return null
-
-  return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-md">
-      {/* Overlay */}
-      <div className="fixed inset-0 bg-on-surface/20 backdrop-blur-sm" onClick={close} />
-
-      {/* Modal Card */}
-      <form
-        onSubmit={handleSave}
-        className="relative z-10 w-full max-w-lg bg-surface rounded-xl shadow-soft flex flex-col max-h-[90vh] overflow-hidden"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-lg py-md border-b border-outline-variant/30 shrink-0">
-          <h2 className="font-headline-sm text-headline-sm text-on-surface">Add Expense</h2>
-          <button
-            type="button"
-            onClick={close}
-            className="text-on-surface-variant hover:text-on-surface transition-colors p-sm rounded-full hover:bg-surface-container"
-            aria-label="Close"
+      <form onSubmit={handleSubmit} className="bg-surface rounded-xl border border-outline-variant/20 p-lg flex flex-col gap-lg">
+        <div className="flex flex-col gap-xs">
+          <label className="font-label-sm text-label-sm text-on-surface-variant">Group</label>
+          <select
+            value={groupId}
+            onChange={e => setGroupId(e.target.value)}
+            className="w-full h-12 px-md rounded-lg border border-outline-variant bg-surface"
           >
-            <span className="material-symbols-outlined">close</span>
-          </button>
+            <option value="">Select a group</option>
+            {(groups.data ?? []).map(g => (
+              <option key={g.id} value={g.id}>{g.name}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-lg space-y-xl">
-          {/* Amount */}
-          <div className="flex flex-col items-center justify-center gap-sm py-md">
-            <label className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
-              Total Amount
-            </label>
-            <div className="flex items-baseline gap-xs">
-              <span className="font-headline-lg text-headline-lg text-on-surface-variant">$</span>
-              <input
-                autoFocus
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                className="w-48 text-center font-display-lg text-display-lg text-on-surface bg-transparent border-none focus:ring-0 placeholder-outline-variant p-0 m-0 outline-none"
-              />
-            </div>
-            <button
-              type="button"
-              className="inline-flex items-center gap-xs px-sm py-xs bg-surface-container rounded-full hover:bg-surface-container-high transition-colors"
-            >
-              <span className="font-label-md text-label-md text-on-surface">USD</span>
-              <span className="material-symbols-outlined text-[16px] text-on-surface-variant">expand_more</span>
-            </button>
+        <div className="flex flex-col gap-xs">
+          <label className="font-label-sm text-label-sm text-on-surface-variant">Description</label>
+          <input
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="e.g. Dinner at restaurant"
+            className="w-full h-12 px-md rounded-lg border border-outline-variant bg-surface"
+          />
+        </div>
+
+        <div className="flex flex-col gap-xs">
+          <label className="font-label-sm text-label-sm text-on-surface-variant">Amount</label>
+          <div className="flex items-center gap-md px-md rounded-lg border border-outline-variant bg-surface">
+            <span className="text-outline">₹</span>
+            <input
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              inputMode="decimal"
+              placeholder="0.00"
+              className="w-full h-12 bg-transparent text-on-surface font-body-md text-body-md outline-none"
+            />
           </div>
+        </div>
 
-          {/* Description + Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
-            <div className="flex flex-col gap-xs">
-              <label className="font-label-sm text-label-sm text-on-surface-variant">Description</label>
-              <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
-                  receipt_long
-                </span>
-                <input
-                  type="text"
-                  placeholder="e.g. Dinner at Mario's"
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  className="w-full h-12 pl-11 pr-md rounded-lg border border-outline-variant bg-surface text-on-surface font-body-md text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-shadow"
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-xs">
-              <label className="font-label-sm text-label-sm text-on-surface-variant">Date</label>
-              <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
-                  calendar_today
-                </span>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
-                  className="w-full h-12 pl-11 pr-md rounded-lg border border-outline-variant bg-surface text-on-surface font-body-md text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-shadow"
-                />
-              </div>
-            </div>
+        <div className="grid grid-cols-2 gap-md">
+          <div className="flex flex-col gap-xs">
+            <label className="font-label-sm text-label-sm text-on-surface-variant">Category</label>
+            <select value={category} onChange={e => setCategory(e.target.value)} className="w-full h-12 px-md rounded-lg border border-outline-variant bg-surface">
+              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
-
-          {/* Paid By + Group */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
-            <div className="flex flex-col gap-xs">
-              <label className="font-label-sm text-label-sm text-on-surface-variant">Paid By</label>
-              <button
-                type="button"
-                className="flex items-center justify-between w-full h-12 px-md rounded-lg border border-outline-variant bg-surface hover:bg-surface-container transition-colors"
-              >
-                <div className="flex items-center gap-sm">
-                  <div className="w-6 h-6 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-label-sm text-label-sm">
-                    YO
-                  </div>
-                  <span className="font-body-md text-body-md text-on-surface">You</span>
-                </div>
-                <span className="material-symbols-outlined text-on-surface-variant">expand_more</span>
-              </button>
-            </div>
-            <div className="flex flex-col gap-xs">
-              <label className="font-label-sm text-label-sm text-on-surface-variant">Group</label>
-              <button
-                type="button"
-                className="flex items-center justify-between w-full h-12 px-md rounded-lg border border-outline-variant bg-surface hover:bg-surface-container transition-colors"
-              >
-                <div className="flex items-center gap-sm">
-                  <span className="material-symbols-outlined text-primary">group</span>
-                  <span className="font-body-md text-body-md text-on-surface">Weekend Trip</span>
-                </div>
-                <span className="material-symbols-outlined text-on-surface-variant">expand_more</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Split Details */}
-          <div className="space-y-md">
-            <div className="flex items-center justify-between">
-              <label className="font-label-sm text-label-sm text-on-surface-variant">Split Details</label>
-              <div className="flex bg-surface-container rounded-lg p-1">
-                {(['equally', 'exact', 'percent'] as SplitMode[]).map(mode => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setSplitMode(mode)}
-                    className={`px-sm py-1 rounded font-label-md text-label-md transition-colors ${
-                      splitMode === mode
-                        ? 'bg-surface shadow-sm text-primary'
-                        : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                  >
-                    {mode === 'equally' ? 'Equally' : mode === 'exact' ? 'Exact' : '%'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-sm">
-              {participants.map(p => (
-                <button
-                  type="button"
-                  key={p.key}
-                  onClick={() => toggleParticipant(p.key)}
-                  className={`w-full flex items-center justify-between p-sm rounded-lg border transition-colors text-left ${
-                    p.included
-                      ? 'border-primary/20 bg-primary/5'
-                      : 'border-outline-variant/50 hover:bg-surface-container-low'
-                  }`}
-                >
-                  <div className="flex items-center gap-md">
-                    <div
-                      className={`w-5 h-5 rounded flex items-center justify-center transition-colors ${
-                        p.included ? 'bg-primary text-on-primary' : 'border border-outline-variant'
-                      }`}
-                    >
-                      {p.included && (
-                        <span className="material-symbols-outlined text-[14px]">check</span>
-                      )}
-                    </div>
-                    <div
-                      className={`w-8 h-8 rounded-full ${p.avatarBg} ${p.avatarTextColor} flex items-center justify-center font-label-md text-label-md`}
-                    >
-                      {p.initials}
-                    </div>
-                    <span className="font-body-md text-body-md text-on-surface font-medium">{p.name}</span>
-                  </div>
-                  <span className="font-label-md text-label-md text-on-surface-variant">{p.amount}</span>
-                </button>
+          <div className="flex flex-col gap-xs">
+            <label className="font-label-sm text-label-sm text-on-surface-variant">Paid by</label>
+            <select value={paidBy} onChange={e => setPaidBy(e.target.value)} className="w-full h-12 px-md rounded-lg border border-outline-variant bg-surface">
+              <option value={user?.id ?? ''}>You</option>
+              {members.filter(m => m.userId !== user?.id).map(m => (
+                <option key={m.userId} value={m.userId}>{m.name}</option>
               ))}
-            </div>
+            </select>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-lg py-md border-t border-outline-variant/30 flex gap-md justify-end bg-surface-container-lowest shrink-0">
-          <button
-            type="button"
-            onClick={close}
-            className="px-lg py-3 rounded-lg border border-outline-variant text-on-surface font-label-md text-label-md hover:bg-surface-container-low transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="px-lg py-3 rounded-lg bg-primary-container text-on-primary font-label-md text-label-md shadow-sm hover:opacity-90 transition-opacity"
-          >
-            Save Expense
-          </button>
+        <div className="flex flex-col gap-xs">
+          <label className="font-label-sm text-label-sm text-on-surface-variant">Split</label>
+          <div className="flex gap-md">
+            <button type="button" onClick={() => setSplitMode('equally')} className={`px-md py-md rounded-lg border ${splitMode === 'equally' ? 'border-primary text-primary' : 'border-outline-variant text-on-surface-variant'}`}>Equally</button>
+            <button type="button" onClick={() => setSplitMode('exact')} className={`px-md py-md rounded-lg border ${splitMode === 'exact' ? 'border-primary text-primary' : 'border-outline-variant text-on-surface-variant'}`}>Exact</button>
+          </div>
+        </div>
+
+        {splitMode === 'exact' && members.length > 0 && (
+          <div className="flex flex-col gap-sm">
+            {members.map(m => (
+              <div key={m.userId} className="flex items-center gap-md">
+                <span className="flex-1 font-label-md text-label-md text-on-surface">{m.name}</span>
+                <div className="flex items-center gap-xs px-md rounded-lg border border-outline-variant bg-surface">
+                  <span className="text-outline">₹</span>
+                  <input
+                    value={exact[m.userId] ?? ''}
+                    onChange={e => setExact(prev => ({ ...prev, [m.userId]: e.target.value }))}
+                    inputMode="decimal"
+                    className="w-28 h-10 bg-transparent text-on-surface outline-none"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-md">
+          <Button variant="secondary" type="button" onClick={() => navigate(-1)}>Cancel</Button>
+          <Button type="submit" disabled={create.loading}>{create.loading ? 'Saving…' : 'Add Expense'}</Button>
         </div>
       </form>
-    </div>,
-    document.body
+    </div>
   )
 }
-

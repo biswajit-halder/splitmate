@@ -1,6 +1,15 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useApi } from '../../hooks/useApi'
+import { notificationsApi } from '../../lib/api/notifications'
+import { useAuth } from '../../context/AuthContext'
 
 export function TopBar() {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const { data } = useApi(() => notificationsApi.list())
+  const unread = data?.unread ?? 0
+  const initials = (user?.name ?? '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()
+
   return (
     <header className="fixed top-0 w-full lg:w-main z-50 glass-panel shadow-sm">
       <div className="flex justify-between items-center h-16 px-md md:px-xxl w-full">
@@ -21,13 +30,20 @@ export function TopBar() {
         </div>
 
         <div className="flex items-center gap-md ml-auto">
-          <button className="relative p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-colors">
+          <button
+            onClick={() => navigate('/notifications')}
+            className="relative p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-colors"
+          >
             <span className="material-symbols-outlined">notifications</span>
-            <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+            {unread > 0 && (
+              <span className="absolute top-1.5 right-1.5 min-w-4 h-4 px-1 rounded-full bg-error text-white text-[10px] flex items-center justify-center">
+                {unread > 9 ? '9+' : unread}
+              </span>
+            )}
           </button>
           <Link to="/profile">
             <div className="w-10 h-10 rounded-full overflow-hidden border border-outline-variant/30 cursor-pointer bg-primary flex items-center justify-center text-on-primary font-bold text-label-md">
-              A
+              {initials}
             </div>
           </Link>
         </div>
@@ -35,4 +51,3 @@ export function TopBar() {
     </header>
   )
 }
-
