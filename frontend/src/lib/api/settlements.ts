@@ -44,9 +44,9 @@ export const settlementsApi = {
       .then(({ settlements }) => settlements.map(s => mapSettlement(s, { id: groupId, name: groupName ?? '' }))),
   create: (groupId: string, body: CreateSettlementPayload) =>
     http.post<{ settlement: { id: string } }>(`/groups/${groupId}/settlements`, {
-      payer_id: body.payerId,
-      payee_id: body.payeeId,
-      amount_paise: body.amountPaise,
+      payerId: body.payerId,
+      payeeId: body.payeeId,
+      amountPaise: body.amountPaise,
       method: body.method,
       note: body.note,
     }),
