@@ -14,3 +14,23 @@ backend/.dev.vars*
 # AI
 .omo
 .playwright-mcp
+
+# Debug logs
+*.log
+backend/*.log
+backend/tail_output.txt
+
+# Test/temp files
+backend/test_body.json
+backend/dev_output.txt
+backend/tail_error.txt
+backend/-
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg
+
+# Wrangler state
+.wrangler/
+.dev.vars
