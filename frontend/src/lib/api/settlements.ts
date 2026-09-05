@@ -3,14 +3,14 @@ import type { Settlement } from '../types'
 
 interface RawSettlement {
   id: string
-  payer_id: string
-  payee_id: string
-  amount_paise: number
+  payerId: string
+  payeeId: string
+  amountPaise: number
   status: string
-  created_at: string
+  createdAt: string
   note: string | null
-  payer_name: string
-  payee_name: string
+  payerName: string
+  payeeName: string
 }
 
 function mapSettlement(s: RawSettlement, group?: { id: string; name: string }): Settlement {
@@ -18,13 +18,13 @@ function mapSettlement(s: RawSettlement, group?: { id: string; name: string }): 
     id: s.id,
     groupId: group?.id,
     groupName: group?.name,
-    amountPaise: s.amount_paise,
+    amountPaise: s.amountPaise,
     status: s.status as Settlement['status'],
-    date: s.created_at,
-    fromName: s.payer_name,
-    toName: s.payee_name,
-    fromUserId: s.payer_id,
-    toUserId: s.payee_id,
+    date: s.createdAt,
+    fromName: s.payerName,
+    toName: s.payeeName,
+    fromUserId: s.payerId,
+    toUserId: s.payeeId,
     note: s.note,
   }
 }
