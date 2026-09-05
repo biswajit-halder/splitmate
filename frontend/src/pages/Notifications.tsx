@@ -57,7 +57,7 @@ export function NotificationsPage() {
         {list.map(n => (
           <div
             key={n.id}
-            className={`flex items-start gap-md p-md rounded-lg bg-surface border border-outline-variant/20 ${n.isRead ? '' : 'border-primary/40'}`}
+            className={`flex items-start gap-md p-md rounded-lg bg-surface border border-line/40 ${n.isRead ? '' : 'border-primary/40'}`}
           >
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-primary text-[18px]">notifications</span>
@@ -76,7 +76,7 @@ export function NotificationsPage() {
           </div>
         ))}
         {!loading && list.length === 0 && (
-          <div className="bg-surface rounded-xl border border-outline-variant/20 p-xl text-center">
+          <div className="bg-surface rounded-xl border border-line/40 p-xl text-center">
             <p className="font-headline-sm text-headline-sm text-on-surface">No notifications</p>
           </div>
         )}

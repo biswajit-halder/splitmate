@@ -10,7 +10,7 @@ const navItems = [
 
 export function BottomNav() {
   return (
-    <nav className="lg:hidden fixed bottom-0 w-full z-50 rounded-t-xl border-t border-outline-variant/20 bg-surface shadow-[0_-4px_12px_rgba(0,0,0,0.05)] flex justify-around items-center h-16 px-md">
+    <nav className="lg:hidden fixed bottom-0 w-full z-50 rounded-t-xl border-t border-line/40 bg-surface shadow-[0_-4px_12px_rgba(0,0,0,0.05)] flex justify-around items-center h-16 px-md">
       {navItems.map(item => (
         <NavLink
           key={item.path}

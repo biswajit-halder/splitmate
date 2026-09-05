@@ -1,6 +1,6 @@
 import { UnauthorizedError } from '../errors/AppError'
 
-const PBKDF2_ITERATIONS = 600_000
+const PBKDF2_ITERATIONS = 100_000
 const SALT_BYTES = 16
 const HASH_BYTES = 32
 

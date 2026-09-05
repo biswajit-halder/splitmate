@@ -84,13 +84,13 @@ export function AddExpensePage() {
         <p className="font-body-md text-body-md text-on-surface-variant mt-xs">Record a shared expense.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-surface rounded-xl border border-outline-variant/20 p-lg flex flex-col gap-lg">
+      <form onSubmit={handleSubmit} className="bg-surface rounded-xl border border-line/40 p-lg flex flex-col gap-lg">
         <div className="flex flex-col gap-xs">
           <label className="font-label-sm text-label-sm text-on-surface-variant">Group</label>
           <select
             value={groupId}
             onChange={e => setGroupId(e.target.value)}
-            className="w-full h-12 px-md rounded-lg border border-outline-variant bg-surface"
+            className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-colors"
           >
             <option value="">Select a group</option>
             {(groups.data ?? []).map(g => (
@@ -105,13 +105,13 @@ export function AddExpensePage() {
             value={description}
             onChange={e => setDescription(e.target.value)}
             placeholder="e.g. Dinner at restaurant"
-            className="w-full h-12 px-md rounded-lg border border-outline-variant bg-surface"
+            className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-colors"
           />
         </div>
 
         <div className="flex flex-col gap-xs">
           <label className="font-label-sm text-label-sm text-on-surface-variant">Amount</label>
-          <div className="flex items-center gap-md px-md rounded-lg border border-outline-variant bg-surface">
+          <div className="flex items-center gap-md px-md rounded-lg border border-line/40 bg-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-colors">
             <span className="text-outline">₹</span>
             <input
               value={amount}
@@ -126,13 +126,13 @@ export function AddExpensePage() {
         <div className="grid grid-cols-2 gap-md">
           <div className="flex flex-col gap-xs">
             <label className="font-label-sm text-label-sm text-on-surface-variant">Category</label>
-            <select value={category} onChange={e => setCategory(e.target.value)} className="w-full h-12 px-md rounded-lg border border-outline-variant bg-surface">
+            <select value={category} onChange={e => setCategory(e.target.value)} className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-colors">
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-xs">
             <label className="font-label-sm text-label-sm text-on-surface-variant">Paid by</label>
-            <select value={paidBy} onChange={e => setPaidBy(e.target.value)} className="w-full h-12 px-md rounded-lg border border-outline-variant bg-surface">
+            <select value={paidBy} onChange={e => setPaidBy(e.target.value)} className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-colors">
               <option value={user?.id ?? ''}>You</option>
               {members.filter(m => m.userId !== user?.id).map(m => (
                 <option key={m.userId} value={m.userId}>{m.name}</option>
@@ -144,8 +144,8 @@ export function AddExpensePage() {
         <div className="flex flex-col gap-xs">
           <label className="font-label-sm text-label-sm text-on-surface-variant">Split</label>
           <div className="flex gap-md">
-            <button type="button" onClick={() => setSplitMode('equally')} className={`px-md py-md rounded-lg border ${splitMode === 'equally' ? 'border-primary text-primary' : 'border-outline-variant text-on-surface-variant'}`}>Equally</button>
-            <button type="button" onClick={() => setSplitMode('exact')} className={`px-md py-md rounded-lg border ${splitMode === 'exact' ? 'border-primary text-primary' : 'border-outline-variant text-on-surface-variant'}`}>Exact</button>
+            <button type="button" onClick={() => setSplitMode('equally')} className={`px-md py-md rounded-lg border ${splitMode === 'equally' ? 'border-primary text-primary' : 'border-line/40 text-on-surface-variant'}`}>Equally</button>
+            <button type="button" onClick={() => setSplitMode('exact')} className={`px-md py-md rounded-lg border ${splitMode === 'exact' ? 'border-primary text-primary' : 'border-line/40 text-on-surface-variant'}`}>Exact</button>
           </div>
         </div>
 
@@ -154,7 +154,7 @@ export function AddExpensePage() {
             {members.map(m => (
               <div key={m.userId} className="flex items-center gap-md">
                 <span className="flex-1 font-label-md text-label-md text-on-surface">{m.name}</span>
-                <div className="flex items-center gap-xs px-md rounded-lg border border-outline-variant bg-surface">
+                <div className="flex items-center gap-xs px-md rounded-lg border border-line/40 bg-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-colors">
                   <span className="text-outline">₹</span>
                   <input
                     value={exact[m.userId] ?? ''}

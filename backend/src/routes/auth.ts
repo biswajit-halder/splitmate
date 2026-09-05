@@ -13,22 +13,24 @@ const registerSchema = z.object({
   password: z.string().min(8),
   name: z.string().min(1).max(80),
   avatar_bg: z.string().optional(),
+  remember: z.boolean().optional(),
 })
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  remember: z.boolean().optional(),
 })
 
 export const authRoutes = new Hono<AppEnv>()
 
-function setSessionCookie(c: Parameters<typeof setCookie>[0], token: string) {
+function setSessionCookie(c: Parameters<typeof setCookie>[0], token: string, maxAge?: number) {
   setCookie(c, COOKIE_NAME, token, {
     httpOnly: true,
     secure: c.env.COOKIE_SECURE === 'true',
-    sameSite: 'Lax',
+    sameSite: (c.env.COOKIE_SAMESITE as 'Lax' | 'None' | 'Strict') || 'Lax',
     path: '/',
-    maxAge: 604800,
+    ...(typeof maxAge === 'number' ? { maxAge } : {}),
   })
 }
 
@@ -47,7 +49,8 @@ authRoutes.post('/register', loginRateLimit, async (c) => {
     .run()
 
   const token = await signToken({ sub: id, email: body.email.toLowerCase() }, c.env.JWT_SECRET)
-  setSessionCookie(c, token)
+  // Registering always starts a session; honor "remember" when provided.
+  setSessionCookie(c, token, body.remember ? 2592000 : undefined)
   return c.json({ token, user: { id, email: body.email.toLowerCase(), name: body.name, avatar_bg: body.avatar_bg ?? null } }, 201)
 })
 
@@ -65,7 +68,8 @@ authRoutes.post('/login', loginRateLimit, async (c) => {
     throw new UnauthorizedError('Invalid email or password')
   }
   const token = await signToken({ sub: row.id, email: row.email }, c.env.JWT_SECRET)
-  setSessionCookie(c, token)
+  // "Remember me" -> 30d cookie; otherwise a session cookie cleared on browser close.
+  setSessionCookie(c, token, body.remember ? 2592000 : undefined)
   return c.json({ token, user: { id: row.id, email: row.email, name: row.name, avatar_bg: row.avatar_bg } })
 })
 

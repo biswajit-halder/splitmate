@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { clearToken, getToken, onUnauthorized, setToken } from '../lib/api/client'
+import { onUnauthorized } from '../lib/api/client'
+import { authApi } from '../lib/api/auth'
 import { usersApi } from '../lib/api/users'
 import type { User } from '../lib/types'
 
@@ -9,7 +10,7 @@ type AuthStatus = 'loading' | 'authed' | 'anon'
 interface AuthContextValue {
   status: AuthStatus
   user: User | null
-  setSession: (token: string, user: User) => void
+  setSession: (user: User) => void
   logout: () => void
 }
 
@@ -21,18 +22,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
 
   const logout = useCallback(() => {
-    clearToken()
+    // Clear the backend session cookie (fire-and-forget).
+    authApi.logout().catch(() => {})
     setUser(null)
     setStatus('anon')
   }, [])
 
-  // Bootstrap: if we have a token, validate it via /api/users/me.
+  // Bootstrap: probe the session via /api/users/me (cookie is sent automatically).
   useEffect(() => {
-    const token = getToken()
-    if (!token) {
-      setStatus('anon')
-      return
-    }
     let active = true
     usersApi
       .me()
@@ -43,7 +40,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         if (!active) return
-        clearToken()
         setStatus('anon')
       })
     return () => {
@@ -59,8 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [logout, navigate])
 
-  const setSession = useCallback((token: string, u: User) => {
-    setToken(token)
+  const setSession = useCallback((u: User) => {
     setUser(u)
     setStatus('authed')
   }, [])

@@ -3,14 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useApi, useMutation } from '../hooks/useApi'
 import { friendsApi } from '../lib/api/friends'
 import { formatMoney } from '../lib/money'
-import { Modal, Button, Skeleton, Badge } from '../components/ui'
+import { Modal, Button, Skeleton, Badge, EmptyState, BlobAvatar } from '../components/ui'
 import { useToast } from '../components/ui'
 
 type Tab = 'friends' | 'requests'
-
-function initial(name: string): string {
-  return name.split(/\s+/).filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
-}
 
 export function FriendsPage() {
   const navigate = useNavigate()
@@ -70,12 +66,12 @@ export function FriendsPage() {
           <h2 className="font-headline-lg md:font-headline-xl text-headline-lg md:text-headline-xl text-on-surface">Friends</h2>
           <p className="font-body-md text-body-md text-on-surface-variant mt-xs">Manage your connections and settle up easily.</p>
         </div>
-        <Button onClick={() => setAddOpen(true)}>
-          <span className="material-symbols-outlined text-[18px]">person_add</span> Add Friend
+        <Button onClick={() => setAddOpen(true)} className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-[18px] leading-none">person_add</span> Add Friend
         </Button>
       </div>
 
-      <div className="flex gap-md border-b border-outline-variant/30">
+      <div className="flex gap-md border-b border-line/40">
         <button
           onClick={() => setTab('friends')}
           className={`pb-md font-label-md text-label-md ${tab === 'friends' ? 'text-primary border-b-2 border-primary' : 'text-on-surface-variant'}`}
@@ -94,18 +90,16 @@ export function FriendsPage() {
         <div className="grid grid-cols-1 gap-lg sm:grid-cols-2 lg:grid-cols-3">
           {friends.loading && <Skeleton height={120} />}
           {(friends.data ?? []).map(f => (
-            <div key={f.id} className="bg-surface rounded-xl border border-outline-variant/20 p-lg">
+            <div key={f.id} className="bg-surface rounded-xl border border-line/40 p-lg hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
               <div className="flex items-center gap-md mb-md">
-                <div className={`w-12 h-12 rounded-full ${f.avatarBg ?? 'bg-surface-container'} flex items-center justify-center font-label-md text-label-md text-on-surface`}>
-                  {f.initials}
-                </div>
+                <BlobAvatar userId={f.id} name={f.name} size={48} />
                 <div className="min-w-0">
                   <p className="font-headline-sm text-headline-sm text-on-surface truncate">{f.name}</p>
                   <p className="font-body-sm text-body-sm text-on-surface-variant truncate">{f.email}</p>
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className={`font-label-md text-label-md ${f.balancePaise > 0 ? 'text-success' : f.balancePaise < 0 ? 'text-error' : 'text-on-surface-variant'}`}>
+                <span className={`font-label-md text-label-md ${f.balancePaise > 0 ? 'text-primary' : f.balancePaise < 0 ? 'text-error' : 'text-on-surface-variant'}`}>
                   {formatMoney(f.balancePaise)}
                 </span>
                 <Button variant="secondary" onClick={() => navigate('/settlements')}>Settle Up</Button>
@@ -113,9 +107,13 @@ export function FriendsPage() {
             </div>
           ))}
           {!friends.loading && (friends.data?.length ?? 0) === 0 && (
-            <div className="bg-surface rounded-xl border border-outline-variant/20 p-xl text-center col-span-full">
-              <p className="font-headline-sm text-headline-sm text-on-surface mb-xs">No friends yet</p>
-              <p className="font-body-sm text-body-sm text-on-surface-variant">Add friends to split expenses together.</p>
+            <div className="col-span-full">
+              <EmptyState
+                icon="person_add"
+                title="No friends yet"
+                description="Add friends to start splitting expenses together."
+                action={{ label: 'Add Friend', onClick: () => setAddOpen(true) }}
+              />
             </div>
           )}
         </div>
@@ -125,11 +123,9 @@ export function FriendsPage() {
         <div className="flex flex-col gap-md">
           {requests.loading && <Skeleton height={80} />}
           {allRequests.map(r => (
-            <div key={r.id} className="bg-surface rounded-xl border border-outline-variant/20 p-lg flex items-center justify-between">
+            <div key={r.id} className="bg-surface rounded-xl border border-line/40 p-lg flex items-center justify-between hover:bg-surface-container-low/50 transition-colors">
               <div className="flex items-center gap-md">
-                <div className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center font-label-md text-label-md text-on-surface">
-                  {initial(r.name)}
-                </div>
+                <BlobAvatar userId={r.userId} name={r.name} size={40} />
                 <div>
                   <p className="font-label-md text-label-md text-on-surface">{r.name}</p>
                   <Badge variant={r.direction === 'incoming' ? 'primary' : 'warning'}>{r.direction}</Badge>
@@ -146,7 +142,7 @@ export function FriendsPage() {
             </div>
           ))}
           {!requests.loading && allRequests.length === 0 && (
-            <div className="bg-surface rounded-xl border border-outline-variant/20 p-xl text-center">
+            <div className="bg-surface rounded-xl border border-line/40 p-xl text-center">
               <p className="font-headline-sm text-headline-sm text-on-surface">No requests</p>
             </div>
           )}
@@ -161,7 +157,7 @@ export function FriendsPage() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="friend@example.com"
-              className="w-full h-12 px-md rounded-lg border border-outline-variant bg-surface"
+              className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface"
             />
           </div>
           <div className="flex justify-end gap-md">

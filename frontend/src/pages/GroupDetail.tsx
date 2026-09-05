@@ -6,7 +6,7 @@ import { settlementsApi } from '../lib/api/settlements'
 import { expensesApi } from '../lib/api/expenses'
 import { balancesApi } from '../lib/api/balances'
 import { formatMoney, toPaise } from '../lib/money'
-import { Modal, Button, Skeleton, Badge } from '../components/ui'
+import { Modal, Button, Skeleton, Badge, EmptyState, BlobAvatar, CategoryIcon } from '../components/ui'
 import { useToast } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 
@@ -109,12 +109,10 @@ export function GroupDetailPage() {
 
   return (
     <div className="flex flex-col gap-xl max-w-content">
-      <div className="bg-surface rounded-xl border border-outline-variant/20 p-lg">
+      <div className="bg-surface rounded-xl border border-line/40 p-lg">
         <div className="flex items-center justify-between flex-wrap gap-md">
           <div className="flex items-center gap-md">
-            <div className={`w-12 h-12 rounded-xl ${g.iconBg ?? 'bg-primary-container'} flex items-center justify-center`}>
-              <span className="material-symbols-outlined text-on-primary">{g.icon ?? 'group'}</span>
-            </div>
+            <CategoryIcon category={g.type ?? 'home'} size={48} />
             <div>
               <h2 className="font-headline-lg text-headline-lg text-on-surface">{g.name}</h2>
               <p className="font-label-sm text-label-sm text-on-surface-variant">{g.type} · {g.members.length} members</p>
@@ -150,18 +148,16 @@ export function GroupDetailPage() {
       </div>
 
       {/* Members */}
-      <div className="bg-surface rounded-xl border border-outline-variant/20 p-lg">
+      <div className="bg-surface rounded-xl border border-line/40 p-lg">
         <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Members</h3>
         <div className="flex flex-col gap-sm">
           {members.map(m => (
-            <div key={m.userId} className="flex items-center justify-between p-md rounded-lg bg-surface-container-low">
+            <div key={m.userId} className="flex items-center justify-between p-md rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors">
               <div className="flex items-center gap-md">
-                <div className={`w-9 h-9 rounded-full ${m.avatarBg ?? 'bg-surface-container'} flex items-center justify-center font-label-sm text-label-sm text-on-surface`}>
-                  {m.name.split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()}
-                </div>
+                <BlobAvatar userId={m.userId} name={m.name} size={36} />
                 <span className="font-label-md text-label-md text-on-surface">{m.name}{m.userId === user?.id ? ' (You)' : ''}</span>
               </div>
-              <span className={`font-label-md text-label-md ${m.netPaise > 0 ? 'text-success' : m.netPaise < 0 ? 'text-error' : 'text-on-surface-variant'}`}>
+              <span className={`font-label-md text-label-md ${m.netPaise > 0 ? 'text-primary' : m.netPaise < 0 ? 'text-error' : 'text-on-surface-variant'}`}>
                 {formatMoney(m.netPaise)}
               </span>
             </div>
@@ -170,7 +166,7 @@ export function GroupDetailPage() {
       </div>
 
       {/* Expenses */}
-      <div className="bg-surface rounded-xl border border-outline-variant/20 p-lg">
+      <div className="bg-surface rounded-xl border border-line/40 p-lg">
         <div className="flex items-center justify-between mb-md">
           <h3 className="font-headline-sm text-headline-sm text-on-surface">Expenses</h3>
           <button onClick={() => navigate(`/expenses/add?group=${g.id}`)} className="font-label-sm text-label-sm text-primary">Add</button>
@@ -196,14 +192,19 @@ export function GroupDetailPage() {
           ))}
           {expenses.loading && <Skeleton height={48} />}
           {!expenses.loading && (expenses.data?.length ?? 0) === 0 && (
-            <p className="font-body-sm text-body-sm text-on-surface-variant">No expenses yet.</p>
+            <EmptyState
+              icon="receipt_long"
+              title="No expenses yet"
+              description="Add your first expense to start tracking."
+              action={{ label: 'Add Expense', onClick: () => navigate(`/expenses/add?group=${g.id}`) }}
+            />
           )}
         </div>
       </div>
 
       {/* Settlements */}
       {(settlements.data?.length ?? 0) > 0 && (
-        <div className="bg-surface rounded-xl border border-outline-variant/20 p-lg">
+        <div className="bg-surface rounded-xl border border-line/40 p-lg">
           <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Settlements</h3>
           <div className="flex flex-col gap-sm">
             {(settlements.data ?? []).map(s => (
@@ -216,7 +217,7 @@ export function GroupDetailPage() {
                   <p className="font-body-sm text-body-sm text-on-surface-variant">{s.date}</p>
                 </div>
                 <Badge variant={s.status === 'confirmed' ? 'success' : s.status === 'pending' ? 'warning' : 'danger'}>{s.status}</Badge>
-                <p className="font-label-md text-label-md text-success">{formatMoney(s.amountPaise)}</p>
+                <p className="font-label-md text-label-md text-primary">{formatMoney(s.amountPaise)}</p>
               </div>
             ))}
           </div>
@@ -231,7 +232,7 @@ export function GroupDetailPage() {
             <select
               value={memberId}
               onChange={e => setMemberId(e.target.value)}
-              className="w-full h-12 px-md rounded-lg border border-outline-variant bg-surface"
+              className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface"
             >
               <option value="">Select a member</option>
               {members.filter(m => m.userId !== user?.id).map(m => (
@@ -241,7 +242,7 @@ export function GroupDetailPage() {
           </div>
           <div className="flex flex-col gap-xs">
             <label className="font-label-sm text-label-sm text-on-surface-variant">Amount</label>
-            <div className="flex items-center gap-md px-md rounded-lg border border-outline-variant bg-surface">
+            <div className="flex items-center gap-md px-md rounded-lg border border-line/40 bg-surface">
               <span className="text-outline">₹</span>
               <input
                 value={amount}
@@ -267,7 +268,7 @@ export function GroupDetailPage() {
               value={inviteEmail}
               onChange={e => setInviteEmail(e.target.value)}
               placeholder="friend@example.com"
-              className="w-full h-12 px-md rounded-lg border border-outline-variant bg-surface"
+              className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface"
             />
           </div>
           <div className="flex justify-end gap-md">

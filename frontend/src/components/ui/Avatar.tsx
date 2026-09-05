@@ -4,6 +4,7 @@ interface AvatarProps extends HTMLAttributes<HTMLDivElement> {
   initials?: string
   size?: 'sm' | 'md' | 'lg'
   online?: boolean
+  color?: string
 }
 
 const sizeClasses = {
@@ -13,11 +14,12 @@ const sizeClasses = {
 }
 
 export const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
-  ({ initials = '?', size = 'md', online, className = '', ...props }, ref) => {
+  ({ initials = '?', size = 'md', online, color, className = '', ...props }, ref) => {
     return (
       <div
         ref={ref}
-        className={`relative inline-flex items-center justify-center rounded-full bg-outline-variant font-label-md text-label-md text-on-surface-variant ${sizeClasses[size]} ${className}`}
+        className={`relative inline-flex items-center justify-center rounded-full font-label-md text-label-md ${color ? 'text-white' : 'bg-outline-variant text-on-surface-variant'} ${sizeClasses[size]} ${className}`}
+        style={color ? { backgroundColor: color } : undefined}
         {...props}
       >
         <span className="uppercase">{initials}</span>

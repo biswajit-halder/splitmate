@@ -10,13 +10,13 @@
     {
       "binding": "DB",
       "database_name": "splitmate-db",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "c4479e34-caad-4378-a3e0-3c51ae85b7e4",
       "migrations_dir": "migrations"
     }
   ],
   "vars": {
     "JWT_SECRET": "dev-only-secret-change-me",
-    "APP_ORIGIN": "http://localhost:5173",
-    "COOKIE_SECURE": "false"
+    "APP_ORIGIN": "https://splitmate.mytrading.workers.dev",
+    "COOKIE_SECURE": "true"
   }
 }

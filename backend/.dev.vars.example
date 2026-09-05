@@ -1,3 +1,6 @@
 JWT_SECRET=dev-only-secret-change-me
 APP_ORIGIN=http://localhost:5173
+# Cookie security. In dev (HTTP) keep COOKIE_SECURE=false and COOKIE_SAMESITE=Lax.
+# For production cross-site cookie auth use COOKIE_SECURE=true and COOKIE_SAMESITE=None.
 COOKIE_SECURE=false
+COOKIE_SAMESITE=Lax

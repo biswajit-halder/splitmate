@@ -46,7 +46,7 @@ export function ExpenseDetailsPage() {
 
   return (
     <div className="flex flex-col gap-xl max-w-content">
-      <div className="bg-surface rounded-xl border border-outline-variant/20 p-lg">
+      <div className="bg-surface rounded-xl border border-line/40 p-lg">
         <div className="flex items-start justify-between gap-md">
           <div className="flex items-center gap-md">
             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -64,7 +64,7 @@ export function ExpenseDetailsPage() {
         <p className="font-headline-md text-headline-md text-on-surface mt-lg">{formatMoney(data.amountPaise)}</p>
       </div>
 
-      <div className="bg-surface rounded-xl border border-outline-variant/20 p-lg">
+      <div className="bg-surface rounded-xl border border-line/40 p-lg">
         <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Split ({data.splitMode})</h3>
         <div className="flex flex-col gap-sm">
           {data.splits.map(s => (

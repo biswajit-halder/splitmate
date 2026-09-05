@@ -8,4 +8,13 @@ export default defineConfig({
   build: {
     outDir: 'dist',
   },
+  server: {
+    // Proxy /api to the backend so cookies are same-origin in dev (cookie auth works over HTTP).
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_URL ?? 'http://localhost:8787',
+        changeOrigin: true,
+      },
+    },
+  },
 })

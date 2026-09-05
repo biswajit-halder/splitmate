@@ -4,6 +4,7 @@ import type { AuthResult } from '../types'
 export interface LoginPayload {
   email: string
   password: string
+  remember?: boolean
 }
 
 export interface RegisterPayload {
@@ -11,6 +12,7 @@ export interface RegisterPayload {
   email: string
   password: string
   avatar_bg?: string
+  remember?: boolean
 }
 
 export const authApi = {

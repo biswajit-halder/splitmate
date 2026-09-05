@@ -4,7 +4,7 @@ import { useApi, useMutation } from '../hooks/useApi'
 import { groupsApi } from '../lib/api/groups'
 import { settlementsApi } from '../lib/api/settlements'
 import { formatMoney, toPaise } from '../lib/money'
-import { Modal, Button, Skeleton, Badge } from '../components/ui'
+import { Modal, Button, Skeleton, Badge, EmptyState } from '../components/ui'
 import { useToast } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 
@@ -90,8 +90,8 @@ export function SettlementsPage() {
           <h2 className="font-headline-lg md:font-headline-xl text-headline-lg md:text-headline-xl text-on-surface">Settlements</h2>
           <p className="font-body-md text-body-md text-on-surface-variant mt-xs">Track and confirm payments between members.</p>
         </div>
-        <Button onClick={() => setNewOpen(true)} disabled={!selectedGroupId}>
-          <span className="material-symbols-outlined text-[18px]">add</span> New Settlement
+        <Button className="flex items-center gap-2" onClick={() => setNewOpen(true)} disabled={!selectedGroupId}>
+          <span className="material-symbols-outlined text-[18px] leading-none">add</span> New Settlement
         </Button>
       </div>
 
@@ -100,7 +100,7 @@ export function SettlementsPage() {
         <select
           value={selectedGroupId}
           onChange={e => setSelectedGroupId(e.target.value)}
-          className="w-full sm:w-80 h-12 px-md rounded-lg border border-outline-variant bg-surface"
+          className="w-full sm:w-80 h-12 px-md rounded-lg border border-line/40 bg-surface"
         >
           <option value="">Select a group</option>
           {(groups.data ?? []).map(g => (
@@ -113,10 +113,10 @@ export function SettlementsPage() {
 
       <div className="flex flex-col gap-md">
         {list.map(s => (
-          <div key={s.id} className="bg-surface rounded-xl border border-outline-variant/20 p-lg flex items-center justify-between">
+          <div key={s.id} className="bg-surface rounded-xl border border-line/40 p-lg flex items-center justify-between hover:bg-surface-container-low/50 transition-colors">
             <div className="flex items-center gap-md">
-              <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center">
-                <span className="material-symbols-outlined text-success">payments</span>
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-primary">payments</span>
               </div>
               <div>
                 <p className="font-label-md text-label-md text-on-surface">{s.fromName} → {s.toName}</p>
@@ -136,9 +136,7 @@ export function SettlementsPage() {
           </div>
         ))}
         {!settlements.loading && selectedGroupId && list.length === 0 && (
-          <div className="bg-surface rounded-xl border border-outline-outline-variant p-xl text-center">
-            <p className="font-headline-sm text-headline-sm text-on-surface">No settlements yet</p>
-          </div>
+          <EmptyState icon="payments" title="No settlements yet" description="Settlements will appear here once you record payments." />
         )}
         {!selectedGroupId && !settlements.loading && (
           <p className="font-body-sm text-body-sm text-on-surface-variant">Select a group to view settlements.</p>
@@ -152,7 +150,7 @@ export function SettlementsPage() {
             <select
               value={memberId}
               onChange={e => setMemberId(e.target.value)}
-              className="w-full h-12 px-md rounded-lg border border-outline-variant bg-surface"
+              className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface"
             >
               <option value="">Select a member</option>
               {members.filter(m => m.userId !== user?.id).map(m => (
@@ -162,7 +160,7 @@ export function SettlementsPage() {
           </div>
           <div className="flex flex-col gap-xs">
             <label className="font-label-sm text-label-sm text-on-surface-variant">Amount</label>
-            <div className="flex items-center gap-md px-md rounded-lg border border-outline-variant bg-surface">
+            <div className="flex items-center gap-md px-md rounded-lg border border-line/40 bg-surface">
               <span className="text-outline">₹</span>
               <input
                 value={amount}

@@ -16,20 +16,6 @@ export class ApiError extends Error {
   }
 }
 
-const TOKEN_KEY = 'splitmate_token'
-
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
-}
-
-export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token)
-}
-
-export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY)
-}
-
 type UnauthorizedHandler = () => void
 let unauthorizedHandler: UnauthorizedHandler | null = null
 
@@ -50,10 +36,7 @@ function toCamelKeys<T>(value: unknown): T {
   return value as T
 }
 
-function apiBase(): string {
-  const base = import.meta.env.VITE_API_URL ?? 'http://localhost:8787'
-  return base.replace(/\/$/, '')
-}
+import { API_BASE } from './config'
 
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown
@@ -62,24 +45,36 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { body, headers, signal, ...rest } = options
-  const url = `${apiBase()}/api${path.startsWith('/') ? path : `/${path}`}`
+  // In dev mode the Vite dev-server proxy handles /api routing (same-origin).
+  // In production the full backend URL is needed.
+  // Runtime hostname check avoids Rolldown tree-shaking the URL string.
+  const isDev = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+  const prefix = isDev ? '' : API_BASE
+  const url = `${prefix}/api${path.startsWith('/') ? path : `/${path}`}`
 
   const finalHeaders: Record<string, string> = {
     ...(headers as Record<string, string> | undefined),
   }
   if (body !== undefined) finalHeaders['Content-Type'] = 'application/json'
-  const token = getToken()
-  if (token) finalHeaders['Authorization'] = `Bearer ${token}`
 
   const res = await fetch(url, {
     ...rest,
     signal,
     headers: finalHeaders,
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    credentials: 'include',
   })
 
-  if (res.status === 401) {
-    clearToken()
+  // A 401 from the auth endpoints is an expected "bad credentials" result, not a
+  // session expiry. A 401 from /users/me is the session probe for anonymous users,
+  // and /auth/logout never requires auth. Don't trigger the global logout/redirect
+  // for those.
+  const skipGlobalHandler =
+    path === '/auth/login' ||
+    path === '/auth/register' ||
+    path === '/users/me' ||
+    path === '/auth/logout'
+  if (res.status === 401 && !skipGlobalHandler) {
     unauthorizedHandler?.()
   }
 

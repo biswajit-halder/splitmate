@@ -42,7 +42,7 @@ export function AnalyticsPage() {
         </Card>
         <Card>
           <p className="font-label-sm text-label-sm text-on-surface-variant">Settled</p>
-          <p className="font-headline-sm text-headline-sm text-success">{trend.loading ? '…' : formatMoney(thisMonth?.settledPaise ?? 0)}</p>
+          <p className="font-headline-sm text-headline-sm text-primary">{trend.loading ? '…' : formatMoney(thisMonth?.settledPaise ?? 0)}</p>
         </Card>
         <Card>
           <p className="font-label-sm text-label-sm text-on-surface-variant">Unsettled</p>
@@ -56,7 +56,7 @@ export function AnalyticsPage() {
         <h3 className="font-headline-sm text-headline-sm text-on-surface mb-lg">6-Month Trend</h3>
         {trend.loading ? <Skeleton height={160} /> : (
           <div className="flex gap-md h-44">
-            <div className="flex-1 flex items-end justify-between gap-xs border-b border-outline-variant/30 pb-xs">
+            <div className="flex-1 flex items-end justify-between gap-xs border-b border-line/40 pb-xs">
               {months.map((m, i) => (
                 <div
                   key={m}
