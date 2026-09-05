@@ -28,12 +28,42 @@ export function SettlementsPage() {
     }
   }, [params, navigate])
 
-  // Auto-select first group when none selected
+  // When a friend is preselected, find which group contains them
   useEffect(() => {
-    if (!selectedGroupId && groups.data && groups.data.length > 0) {
+    if (!preselectedPayTo || !groups.data || groups.data.length === 0) return
+
+    const controller = new AbortController()
+
+    const findGroupWithFriend = async () => {
+      for (const group of groups.data!) {
+        if (controller.signal.aborted) return
+        try {
+          const detail = await groupsApi.get(group.id)
+          if (controller.signal.aborted) return
+          if (detail.members.some(m => m.userId === preselectedPayTo)) {
+            setSelectedGroupId(group.id)
+            return
+          }
+        } catch {
+          // Skip groups that fail to load
+        }
+      }
+      // Fallback: no group contains the friend, select first group
+      if (!controller.signal.aborted) {
+        setSelectedGroupId(groups.data![0].id)
+      }
+    }
+
+    findGroupWithFriend()
+    return () => controller.abort()
+  }, [preselectedPayTo, groups.data])
+
+  // Auto-select first group when none selected and no friend preselected
+  useEffect(() => {
+    if (!preselectedPayTo && !selectedGroupId && groups.data && groups.data.length > 0) {
       setSelectedGroupId(groups.data[0].id)
     }
-  }, [selectedGroupId, groups.data])
+  }, [preselectedPayTo, selectedGroupId, groups.data])
 
   const selectedGroup = useMemo(
     () => (groups.data ?? []).find(g => g.id === selectedGroupId),
