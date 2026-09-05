@@ -4,7 +4,7 @@ import { useApi, useMutation } from '../hooks/useApi'
 import { groupsApi } from '../lib/api/groups'
 import { settlementsApi } from '../lib/api/settlements'
 import { formatMoney } from '../lib/money'
-import { Button, Skeleton, Badge, EmptyState, SettleModal } from '../components/ui'
+import { Button, Skeleton, Badge, EmptyState, SettleModal, Select } from '../components/ui'
 import { useToast } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 
@@ -120,16 +120,13 @@ export function SettlementsPage() {
 
       <div className="flex flex-col gap-xs">
         <label className="font-label-sm text-label-sm text-on-surface-variant">Group</label>
-        <select
+        <Select
           value={selectedGroupId}
-          onChange={e => setSelectedGroupId(e.target.value)}
-          className="w-full sm:w-80 h-12 px-md rounded-lg border border-line/40 bg-surface font-body-md text-body-md text-on-surface"
-        >
-          <option value="">Select a group</option>
-          {(groups.data ?? []).map(g => (
-            <option key={g.id} value={g.id}>{g.name}</option>
-          ))}
-        </select>
+          onChange={setSelectedGroupId}
+          placeholder="Select a group"
+          options={(groups.data ?? []).map(g => ({ value: g.id, label: g.name }))}
+          className="w-full sm:w-80"
+        />
       </div>
 
       {settlements.loading && <Skeleton height={120} />}

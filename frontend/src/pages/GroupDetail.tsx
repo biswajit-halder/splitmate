@@ -6,7 +6,7 @@ import { settlementsApi } from '../lib/api/settlements'
 import { expensesApi } from '../lib/api/expenses'
 import { balancesApi } from '../lib/api/balances'
 import { formatMoney, toPaise } from '../lib/money'
-import { Modal, Button, Skeleton, Badge, EmptyState, BlobAvatar, CategoryIcon } from '../components/ui'
+import { Modal, Button, Skeleton, Badge, EmptyState, BlobAvatar, CategoryIcon, Select } from '../components/ui'
 import { useToast } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 
@@ -285,16 +285,12 @@ export function GroupDetailPage() {
         <div className="flex flex-col gap-lg">
           <div className="flex flex-col gap-xs">
             <label className="font-label-sm text-label-sm text-on-surface-variant">Pay to</label>
-            <select
+            <Select
               value={memberId}
-              onChange={e => setMemberId(e.target.value)}
-              className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface"
-            >
-              <option value="">Select a member</option>
-              {members.filter(m => m.userId !== user?.id).map(m => (
-                <option key={m.userId} value={m.userId}>{m.name}</option>
-              ))}
-            </select>
+              onChange={setMemberId}
+              placeholder="Select a member"
+              options={members.filter(m => m.userId !== user?.id).map(m => ({ value: m.userId, label: m.name }))}
+            />
           </div>
           <div className="flex flex-col gap-xs">
             <label className="font-label-sm text-label-sm text-on-surface-variant">Amount</label>

@@ -4,7 +4,7 @@ import { useApi, useMutation } from '../hooks/useApi'
 import { groupsApi } from '../lib/api/groups'
 import { expensesApi } from '../lib/api/expenses'
 import { toPaise, fromPaise } from '../lib/money'
-import { Button } from '../components/ui'
+import { Button, Select } from '../components/ui'
 import { useToast } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 
@@ -142,16 +142,12 @@ export function AddExpensePage() {
       <form onSubmit={handleSubmit} className="bg-surface rounded-xl border border-line/40 p-lg flex flex-col gap-lg">
         <div className="flex flex-col gap-xs">
           <label className="font-label-sm text-label-sm text-on-surface-variant">Group</label>
-          <select
+          <Select
             value={groupId}
-            onChange={e => setGroupId(e.target.value)}
-            className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-colors"
-          >
-            <option value="">Select a group</option>
-            {(groups.data ?? []).map(g => (
-              <option key={g.id} value={g.id}>{g.name}</option>
-            ))}
-          </select>
+            onChange={setGroupId}
+            placeholder="Select a group"
+            options={(groups.data ?? []).map(g => ({ value: g.id, label: g.name }))}
+          />
         </div>
 
         <div className="flex flex-col gap-xs">
@@ -181,18 +177,22 @@ export function AddExpensePage() {
         <div className="grid grid-cols-2 gap-md">
           <div className="flex flex-col gap-xs">
             <label className="font-label-sm text-label-sm text-on-surface-variant">Category</label>
-            <select value={category} onChange={e => setCategory(e.target.value)} className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-colors">
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <Select
+              value={category}
+              onChange={setCategory}
+              options={CATEGORIES.map(c => ({ value: c, label: c }))}
+            />
           </div>
           <div className="flex flex-col gap-xs">
             <label className="font-label-sm text-label-sm text-on-surface-variant">Paid by</label>
-            <select value={paidBy} onChange={e => setPaidBy(e.target.value)} className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-colors">
-              <option value={user?.id ?? ''}>You</option>
-              {members.filter(m => m.userId !== user?.id).map(m => (
-                <option key={m.userId} value={m.userId}>{m.name}</option>
-              ))}
-            </select>
+            <Select
+              value={paidBy}
+              onChange={setPaidBy}
+              options={[
+                { value: user?.id ?? '', label: 'You' },
+                ...members.filter(m => m.userId !== user?.id).map(m => ({ value: m.userId, label: m.name })),
+              ]}
+            />
           </div>
         </div>
 

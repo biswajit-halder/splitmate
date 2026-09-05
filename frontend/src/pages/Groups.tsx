@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { groupsApi } from '../lib/api/groups'
 import { formatMoney } from '../lib/money'
-import { Skeleton, Modal, useToast, EmptyState, CategoryIcon } from '../components/ui'
+import { Skeleton, Modal, useToast, EmptyState, CategoryIcon, Select } from '../components/ui'
 import { GroupsSkeleton } from '../components/skeletons/GroupsSkeleton'
 
 function categoryFromGroup(group: { type: string | null }): 'trip' | 'home' | 'food' | 'social' | 'office' {
@@ -115,16 +115,15 @@ export function GroupsPage() {
         <button className="h-10 w-10 flex items-center justify-center rounded-lg border border-line/40 hover:bg-surface-container-low transition-colors text-on-surface-variant">
           <span className="material-symbols-outlined text-[20px]">tune</span>
         </button>
-        <select
+        <Select
           value={filter}
-          onChange={e => setFilter(e.target.value)}
-          className="h-10 px-md rounded-lg border border-line/40 bg-surface font-body-md text-body-md text-on-surface focus:border-primary outline-none cursor-pointer"
-        >
-          <option value="all">All Groups</option>
-          {GROUP_TYPES.map(({ value, label }) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: 'All Groups' },
+            ...GROUP_TYPES.map(({ value, label }) => ({ value, label })),
+          ]}
+          className="h-10"
+        />
       </div>
 
       {loading && <Skeleton height={300} />}

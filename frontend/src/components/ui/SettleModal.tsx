@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useToast } from './Toast'
 import { Modal } from './Modal'
 import { Button } from './Button'
+import { Select } from './Select'
 
 interface SettleModalProps {
   open: boolean
@@ -109,16 +110,12 @@ export function SettleModal({ open, onClose, groupId, groupName, members, onSett
       <div className="flex flex-col gap-lg">
         <div className="flex flex-col gap-xs">
           <label className="font-label-sm text-label-sm text-on-surface-variant">Pay To</label>
-          <select
+          <Select
             value={toUserId}
-            onChange={e => setToUserId(e.target.value)}
-            className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface font-body-md text-body-md text-on-surface"
-          >
-            <option value="">Select a member</option>
-            {eligibleMembers.map(m => (
-              <option key={m.userId} value={m.userId}>{m.name}</option>
-            ))}
-          </select>
+            onChange={setToUserId}
+            placeholder="Select a member"
+            options={eligibleMembers.map(m => ({ value: m.userId, label: m.name }))}
+          />
           {toUserId && !balances.loading && (
             <span className={`font-body-sm text-body-sm ${
               selectedBalance > 0 ? 'text-success' :
@@ -151,15 +148,11 @@ export function SettleModal({ open, onClose, groupId, groupName, members, onSett
 
         <div className="flex flex-col gap-xs">
           <label className="font-label-sm text-label-sm text-on-surface-variant">Payment Method</label>
-          <select
+          <Select
             value={method}
-            onChange={e => setMethod(e.target.value)}
-            className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface font-body-md text-body-md text-on-surface"
-          >
-            {PAYMENT_METHODS.map(m => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+            onChange={setMethod}
+            options={PAYMENT_METHODS.map(m => ({ value: m, label: m }))}
+          />
         </div>
 
         <div className="flex flex-col gap-xs">
