@@ -9,4 +9,7 @@ export const friendsApi = {
     http.post<{ request: { id: string } }>('/friends/requests', { email }),
   accept: (id: string) => http.post<{ ok: true }>(`/friends/requests/${id}/accept`),
   reject: (id: string) => http.post<{ ok: true }>(`/friends/requests/${id}/reject`),
+  removeFriend: (userId: string) => http.delete<{ ok: true }>(`/friends/${userId}`),
+  cancelRequest: (requestId: string) =>
+    http.delete<{ ok: true }>(`/friends/requests/${requestId}`),
 }

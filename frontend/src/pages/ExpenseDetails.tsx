@@ -4,6 +4,7 @@ import { expensesApi } from '../lib/api/expenses'
 import { formatMoney } from '../lib/money'
 import { Skeleton, Button } from '../components/ui'
 import { useToast } from '../components/ui'
+import { useAuth } from '../context/AuthContext'
 
 const CATEGORY_ICONS: Record<string, string> = {
   Food: 'restaurant',
@@ -18,6 +19,7 @@ export function ExpenseDetailsPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const { addToast } = useToast()
+  const { user } = useAuth()
   const { data, loading } = useApi(() => expensesApi.get(id), [id])
   const remove = useMutation((eid: string) => expensesApi.remove(eid))
 
@@ -59,7 +61,12 @@ export function ExpenseDetailsPage() {
               </p>
             </div>
           </div>
-          <Button variant="danger" onClick={handleDelete}>Delete</Button>
+          <div className="flex gap-md">
+            {data.paidBy === user?.id && (
+              <Button variant="primary" onClick={() => navigate(`/add-expense?edit=${data.id}`)}>Edit</Button>
+            )}
+            <Button variant="danger" onClick={handleDelete}>Delete</Button>
+          </div>
         </div>
         <p className="font-headline-md text-headline-md text-on-surface mt-lg">{formatMoney(data.amountPaise)}</p>
       </div>

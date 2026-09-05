@@ -8,6 +8,11 @@ export function formatSigned(paise: number): string {
   return `${sign}${formatMoney(Math.abs(paise))}`
 }
 
+/** Convert integer paise back to a rupee string for form inputs. */
+export function fromPaise(paise: number): string {
+  return (paise / 100).toFixed(2)
+}
+
 /** Convert a rupee string/number input into integer paise (string-based to avoid float drift). */
 export function toPaise(input: string | number): number {
   const str = typeof input === 'number' ? input.toFixed(2) : input.trim()

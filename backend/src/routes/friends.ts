@@ -175,3 +175,39 @@ friendRoutes.post('/friends/requests/:id/reject', async (c) => {
     .run()
   return c.json({ ok: true })
 })
+
+friendRoutes.delete('/friends/requests/:id', async (c) => {
+  const userId = c.get('userId')
+  const id = c.req.param('id')
+  const { DB } = c.env
+
+  const request = await DB.prepare(
+    'SELECT id, requester_id, status FROM friend_requests WHERE id = ?'
+  )
+    .bind(id)
+    .first<{ id: string; requester_id: string; status: string }>()
+
+  if (!request) throw new NotFoundError('Friend request not found')
+  if (request.requester_id !== userId) throw new ForbiddenError('You can only cancel your own outgoing requests')
+  if (request.status !== 'pending') throw new BadRequestError('Only pending requests can be cancelled')
+
+  await DB.prepare('DELETE FROM friend_requests WHERE id = ?').bind(id).run()
+  return c.json({ ok: true })
+})
+
+friendRoutes.delete('/friends/:id', async (c) => {
+  const userId = c.get('userId')
+  const friendUserId = c.req.param('id')
+  const { DB } = c.env
+
+  if (friendUserId === userId) throw new BadRequestError('You cannot remove yourself')
+
+  await DB.prepare(
+    `DELETE FROM friend_requests
+     WHERE (requester_id = ? AND addressee_id = ?) OR (requester_id = ? AND addressee_id = ?)`
+  )
+    .bind(userId, friendUserId, friendUserId, userId)
+    .run()
+
+  return c.json({ ok: true })
+})

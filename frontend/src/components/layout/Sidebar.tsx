@@ -5,6 +5,7 @@ const navItems = [
   { path: '/groups', label: 'Groups', icon: 'group' },
   { path: '/friends', label: 'Friends', icon: 'person' },
   { path: '/activity', label: 'Activity', icon: 'history' },
+  { path: '/analytics', label: 'Analytics', icon: 'bar_chart' },
   { path: '/settlements', label: 'Settlements', icon: 'payments' },
 ]
 

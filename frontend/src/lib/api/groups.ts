@@ -19,4 +19,6 @@ export const groupsApi = {
     http.post<{ invite: { id: string; email: string } }>(`/groups/${id}/invite`, { email }),
   join: (id: string) => http.post<{ ok: true }>(`/groups/${id}/join`),
   balances: (id: string) => http.get<GroupBalances>(`/groups/${id}/balances`),
+  leave: (id: string) => http.post<{ ok: true }>(`/groups/${id}/leave`),
+  removeMember: (id: string, userId: string) => http.delete<{ ok: true }>(`/groups/${id}/members/${userId}`),
 }

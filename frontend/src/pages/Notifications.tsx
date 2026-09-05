@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useApi, useMutation } from '../hooks/useApi'
 import { notificationsApi } from '../lib/api/notifications'
 import { Skeleton, Button, Badge } from '../components/ui'
@@ -13,10 +15,17 @@ function timeAgo(iso: string): string {
 }
 
 export function NotificationsPage() {
-  const { data, loading, refetch } = useApi(() => notificationsApi.list())
+  const navigate = useNavigate()
+  const { data, loading, error, refetch } = useApi(() => notificationsApi.list())
   const { addToast } = useToast()
   const markAll = useMutation(() => notificationsApi.markAllRead())
   const markOne = useMutation((id: string) => notificationsApi.markRead(id))
+
+  useEffect(() => {
+    if (error) {
+      addToast('Failed to load notifications', 'error')
+    }
+  }, [error, addToast])
 
   const handleAll = async () => {
     try {
@@ -24,7 +33,7 @@ export function NotificationsPage() {
       addToast('All marked as read', 'success')
       refetch()
     } catch {
-      /* ignore */
+      addToast('Failed to mark all as read', 'error')
     }
   }
 
@@ -33,7 +42,17 @@ export function NotificationsPage() {
       await markOne.mutate(id)
       refetch()
     } catch {
-      /* ignore */
+      addToast('Failed to mark as read', 'error')
+    }
+  }
+
+  const handleNotificationClick = (n: { id: string; type: string | null; refId: string | null }) => {
+    if (n.type === 'expense' && n.refId) {
+      navigate(`/expenses/${n.refId}`)
+    } else if (n.type === 'group' && n.refId) {
+      navigate(`/groups/${n.refId}`)
+    } else if (n.type === 'settlement') {
+      navigate('/settlements')
     }
   }
 
@@ -55,9 +74,10 @@ export function NotificationsPage() {
 
       <div className="flex flex-col gap-sm">
         {list.map(n => (
-          <div
+          <button
             key={n.id}
-            className={`flex items-start gap-md p-md rounded-lg bg-surface border border-line/40 ${n.isRead ? '' : 'border-primary/40'}`}
+            onClick={() => handleNotificationClick(n)}
+            className={`flex items-start gap-md p-md rounded-lg bg-surface border border-line/40 text-left cursor-pointer hover:bg-surface-container-low/50 transition-colors ${n.isRead ? '' : 'border-primary/40'}`}
           >
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-primary text-[18px]">notifications</span>
@@ -71,9 +91,9 @@ export function NotificationsPage() {
               <p className="font-body-sm text-body-sm text-on-surface-variant mt-xs">{timeAgo(n.createdAt)}</p>
             </div>
             {!n.isRead && (
-              <Button variant="ghost" onClick={() => handleOne(n.id)}>Mark read</Button>
+              <Button variant="ghost" onClick={(e) => { e.stopPropagation(); handleOne(n.id) }}>Mark read</Button>
             )}
-          </div>
+          </button>
         ))}
         {!loading && list.length === 0 && (
           <div className="bg-surface rounded-xl border border-line/40 p-xl text-center">

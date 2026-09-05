@@ -6,30 +6,37 @@ import { formatMoney } from '../lib/money'
 import { Skeleton, Modal, useToast, EmptyState, CategoryIcon } from '../components/ui'
 import { GroupsSkeleton } from '../components/skeletons/GroupsSkeleton'
 
-const ICON_TO_CATEGORY: Record<string, string> = {
-  flight: 'trip',
-  home: 'home',
-  restaurant: 'food',
-  group: 'social',
-  business: 'office',
+function categoryFromGroup(group: { type: string | null }): 'trip' | 'home' | 'food' | 'social' | 'office' {
+  switch (group.type) {
+    case 'trip': return 'trip'
+    case 'home': return 'home'
+    case 'food': return 'food'
+    case 'social': return 'social'
+    case 'office': return 'office'
+    default: return 'home'
+  }
 }
 
-function categoryFromGroup(group: { type: string | null; icon: string | null }): string {
-  if (group.type) return group.type
-  return ICON_TO_CATEGORY[group.icon ?? ''] ?? 'home'
-}
+const GROUP_TYPES = [
+  { value: 'home', label: 'Home', icon: 'home' },
+  { value: 'food', label: 'Food & Dining', icon: 'restaurant' },
+  { value: 'trip', label: 'Trip & Travel', icon: 'flight' },
+  { value: 'social', label: 'Social', icon: 'group' },
+  { value: 'office', label: 'Office', icon: 'business' },
+]
 
 export function GroupsPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { addToast } = useToast()
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'all' | 'active' | 'settled'>('all')
+  const [filter, setFilter] = useState<string>('all')
   const { data, loading, refetch } = useApi(() => groupsApi.list())
   const groups = data ?? []
 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
+  const [newGroupType, setNewGroupType] = useState<string>('home')
   const [creating, setCreating] = useState(false)
 
   // Open create modal when ?new=1 is present
@@ -47,9 +54,10 @@ export function GroupsPage() {
 
     setCreating(true)
     try {
-      await groupsApi.create({ name })
+      await groupsApi.create({ name, type: newGroupType })
       setShowCreateModal(false)
       setNewGroupName('')
+      setNewGroupType('home')
       refetch()
       addToast('Group created successfully', 'success')
     } catch {
@@ -65,8 +73,11 @@ export function GroupsPage() {
       const q = search.toLowerCase()
       result = result.filter(g => g.name.toLowerCase().includes(q))
     }
+    if (filter !== 'all') {
+      result = result.filter(g => g.type === filter)
+    }
     return result
-  }, [groups, search])
+  }, [groups, search, filter])
 
   if (loading) {
     return <GroupsSkeleton />
@@ -101,17 +112,18 @@ export function GroupsPage() {
             className="w-full h-10 pl-10 pr-md rounded-lg border border-line/40 bg-surface font-body-md text-body-md placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-shadow"
           />
         </div>
-        <button className="p-2 rounded-lg border border-line/40 hover:bg-surface-container-low transition-colors text-on-surface-variant">
+        <button className="h-10 w-10 flex items-center justify-center rounded-lg border border-line/40 hover:bg-surface-container-low transition-colors text-on-surface-variant">
           <span className="material-symbols-outlined text-[20px]">tune</span>
         </button>
         <select
           value={filter}
-          onChange={e => setFilter(e.target.value as typeof filter)}
+          onChange={e => setFilter(e.target.value)}
           className="h-10 px-md rounded-lg border border-line/40 bg-surface font-body-md text-body-md text-on-surface focus:border-primary outline-none cursor-pointer"
         >
           <option value="all">All Groups</option>
-          <option value="active">Active</option>
-          <option value="settled">Settled</option>
+          {GROUP_TYPES.map(({ value, label }) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
         </select>
       </div>
 
@@ -187,7 +199,7 @@ export function GroupsPage() {
                       {/* Balance */}
                       <div className="text-right">
                         <p className="font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wide">Your Balance</p>
-                        <p className={`font-label-md text-label-md font-semibold ${balance >= 0 ? 'text-primary' : 'text-error'}`}>
+                        <p className={`font-label-md text-label-md font-semibold ${balance >= 0 ? 'text-success' : 'text-error'}`}>
                           {balance >= 0 ? '+' : ''}{formatMoney(balance)}
                         </p>
                       </div>
@@ -201,7 +213,7 @@ export function GroupsPage() {
       )}
 
       {/* Create Group Modal */}
-      <Modal isOpen={showCreateModal} onClose={() => { setShowCreateModal(false); setNewGroupName('') }} title="Create New Group">
+      <Modal isOpen={showCreateModal} onClose={() => { setShowCreateModal(false); setNewGroupName(''); setNewGroupType('home') }} title="Create New Group">
         <form onSubmit={handleCreateGroup} className="flex flex-col gap-lg">
           <div className="flex flex-col gap-sm">
             <label className="font-label-sm text-label-sm text-on-surface-variant" htmlFor="group-name">
@@ -217,10 +229,32 @@ export function GroupsPage() {
               autoFocus
             />
           </div>
+          <div className="flex flex-col gap-sm">
+            <label className="font-label-sm text-label-sm text-on-surface-variant">
+              Category
+            </label>
+            <div className="flex flex-wrap gap-sm">
+              {GROUP_TYPES.map(({ value, label, icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setNewGroupType(value)}
+                  className={`flex items-center gap-xs px-3 py-2 rounded-lg font-label-sm text-label-sm transition-all duration-200 ${
+                    newGroupType === value
+                      ? 'bg-primary text-on-primary shadow-sm'
+                      : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[18px]">{icon}</span>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex justify-end gap-md">
             <button
               type="button"
-              onClick={() => { setShowCreateModal(false); setNewGroupName('') }}
+              onClick={() => { setShowCreateModal(false); setNewGroupName(''); setNewGroupType('home') }}
               className="px-6 py-3 rounded-lg border border-line/40 text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-low transition-colors"
             >
               Cancel

@@ -267,3 +267,62 @@ groupRoutes.post('/groups/:id/join', async (c) => {
 
   return c.json({ ok: true })
 })
+
+groupRoutes.post('/groups/:id/leave', async (c) => {
+  const groupId = c.req.param('id')
+  const userId = c.get('userId')
+  const { DB } = c.env
+
+  const membership = await getMembership(c, groupId)
+  if (!membership) throw new ForbiddenError('You are not a member of this group')
+
+  const hasBalance = await DB.prepare(
+    'SELECT 1 FROM balances WHERE group_id = ? AND (user_id = ? OR counterpart_id = ?) AND net_amount_paise != 0 LIMIT 1'
+  )
+    .bind(groupId, userId, userId)
+    .first()
+  if (hasBalance) throw new ForbiddenError('Cannot leave: you have outstanding balances in this group')
+
+  await DB.batch([
+    DB.prepare('DELETE FROM group_members WHERE group_id = ? AND user_id = ?').bind(groupId, userId),
+    DB.prepare('DELETE FROM balances WHERE group_id = ? AND (user_id = ? OR counterpart_id = ?)').bind(groupId, userId, userId),
+  ])
+
+  return c.json({ ok: true })
+})
+
+groupRoutes.delete('/groups/:id/members/:userId', async (c) => {
+  const groupId = c.req.param('id')
+  const targetUserId = c.req.param('userId')
+  const userId = c.get('userId')
+  const { DB } = c.env
+
+  const group = await DB.prepare('SELECT id, created_by FROM groups WHERE id = ?').bind(groupId).first<{
+    id: string
+    created_by: string
+  }>()
+  if (!group) throw new NotFoundError('Group not found')
+  if (group.created_by !== userId) throw new ForbiddenError('Only the group creator can remove members')
+  if (targetUserId === userId) throw new ForbiddenError('Group creator cannot remove themselves')
+
+  const targetMembership = await DB.prepare(
+    'SELECT id FROM group_members WHERE group_id = ? AND user_id = ?'
+  )
+    .bind(groupId, targetUserId)
+    .first<{ id: string }>()
+  if (!targetMembership) throw new NotFoundError('User is not a member of this group')
+
+  const hasBalance = await DB.prepare(
+    'SELECT 1 FROM balances WHERE group_id = ? AND (user_id = ? OR counterpart_id = ?) AND net_amount_paise != 0 LIMIT 1'
+  )
+    .bind(groupId, targetUserId, targetUserId)
+    .first()
+  if (hasBalance) throw new ForbiddenError('Cannot remove: user has outstanding balances in this group')
+
+  await DB.batch([
+    DB.prepare('DELETE FROM group_members WHERE group_id = ? AND user_id = ?').bind(groupId, targetUserId),
+    DB.prepare('DELETE FROM balances WHERE group_id = ? AND (user_id = ? OR counterpart_id = ?)').bind(groupId, targetUserId, targetUserId),
+  ])
+
+  return c.json({ ok: true })
+})

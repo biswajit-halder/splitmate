@@ -33,8 +33,16 @@ import { groupsApi } from '../lib/api/groups'
 import { friendsApi } from '../lib/api/friends'
 import { useAuth } from '../context/AuthContext'
 import { useToast, Button, BlobAvatar, PasswordInput } from '../components/ui'
+import { getAvatarPair } from '../lib/avatarColors'
 
-const AVATAR_BG_OPTIONS = ['bg-primary-container', 'bg-secondary-container', 'bg-tertiary-container', 'bg-error-container']
+type AvatarBgOption = { label: string; className: string; preview: string }
+
+const AVATAR_BG_OPTIONS: AvatarBgOption[] = [
+  { label: 'Clay', className: 'bg-[#A64B2A]', preview: '#A64B2A' },
+  { label: 'Olive', className: 'bg-[#6B7A4F]', preview: '#6B7A4F' },
+  { label: 'Gold', className: 'bg-[#D9A441]', preview: '#D9A441' },
+  { label: 'Default', className: 'bg-primary', preview: '' },
+]
 
 export function ProfilePage() {
   const navigate = useNavigate()
@@ -42,7 +50,7 @@ export function ProfilePage() {
   const { addToast } = useToast()
   const [name, setName] = useState(user?.name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
-  const [avatarBg, setAvatarBg] = useState(user?.avatarBg ?? AVATAR_BG_OPTIONS[0])
+  const [avatarBg, setAvatarBg] = useState(user?.avatarBg ?? AVATAR_BG_OPTIONS[0].className)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [emailConfirmPassword, setEmailConfirmPassword] = useState('')
@@ -178,11 +186,21 @@ export function ProfilePage() {
           <div className="flex gap-sm">
             {AVATAR_BG_OPTIONS.map(opt => (
               <button
-                key={opt}
+                key={opt.className}
                 type="button"
-                onClick={() => setAvatarBg(opt)}
-                className={`w-9 h-9 rounded-full ${opt} ${avatarBg === opt ? 'ring-2 ring-offset-2 ring-primary' : ''}`}
-              />
+                onClick={() => setAvatarBg(opt.className)}
+                title={opt.label}
+                className={`relative flex items-center justify-center w-10 h-10 text-xs font-medium transition-shadow ${
+                  avatarBg === opt.className ? 'ring-2 ring-offset-2 ring-primary shadow-md' : ''
+                }`}
+                style={{
+                  borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%',
+                  backgroundColor: opt.preview || undefined,
+                  color: opt.preview ? getAvatarPair(user?.id ?? 'default').text : 'var(--color-on-primary)',
+                }}
+              >
+                {(user?.name ?? '?')[0].toUpperCase()}
+              </button>
             ))}
           </div>
         </div>

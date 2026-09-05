@@ -21,6 +21,8 @@ export function FriendsPage() {
   const send = useMutation((e: string) => friendsApi.send(e))
   const accept = useMutation((rid: string) => friendsApi.accept(rid))
   const reject = useMutation((rid: string) => friendsApi.reject(rid))
+  const removeFriend = useMutation((uid: string) => friendsApi.removeFriend(uid))
+  const cancelRequest = useMutation((rid: string) => friendsApi.cancelRequest(rid))
 
   const handleSend = async () => {
     if (!email.trim()) return
@@ -52,6 +54,26 @@ export function FriendsPage() {
       requests.refetch()
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed', 'error' as never)
+    }
+  }
+
+  const doRemoveFriend = async (uid: string) => {
+    try {
+      await removeFriend.mutate(uid)
+      addToast('Friend removed', 'success')
+      friends.refetch()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to remove friend', 'error' as never)
+    }
+  }
+
+  const doCancelRequest = async (rid: string) => {
+    try {
+      await cancelRequest.mutate(rid)
+      addToast('Request cancelled', 'success')
+      requests.refetch()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to cancel request', 'error' as never)
     }
   }
 
@@ -99,10 +121,13 @@ export function FriendsPage() {
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className={`font-label-md text-label-md ${f.balancePaise > 0 ? 'text-primary' : f.balancePaise < 0 ? 'text-error' : 'text-on-surface-variant'}`}>
+                <span className={`font-label-md text-label-md ${f.balancePaise > 0 ? 'text-success' : f.balancePaise < 0 ? 'text-error' : 'text-on-surface-variant'}`}>
                   {formatMoney(f.balancePaise)}
                 </span>
-                <Button variant="secondary" onClick={() => navigate('/settlements')}>Settle Up</Button>
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => navigate(`/settlements?new=1&payTo=${f.id}&payToName=${encodeURIComponent(f.name)}`)}>Settle Up</Button>
+                  <Button variant="danger" onClick={() => doRemoveFriend(f.id)}>Remove</Button>
+                </div>
               </div>
             </div>
           ))}
@@ -137,7 +162,7 @@ export function FriendsPage() {
                   <Button onClick={() => doAccept(r.id)}>Accept</Button>
                 </div>
               ) : (
-                <span className="font-body-sm text-body-sm text-on-surface-variant">Pending</span>
+                <Button variant="danger" className="px-3 py-1.5 text-[12px]" onClick={() => doCancelRequest(r.id)}>Cancel</Button>
               )}
             </div>
           ))}

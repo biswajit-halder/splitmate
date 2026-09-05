@@ -38,12 +38,17 @@ export function GroupDetailPage() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [memberId, setMemberId] = useState('')
   const [amount, setAmount] = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<(() => Promise<void>) | null>(null)
+  const [confirmMessage, setConfirmMessage] = useState('')
 
   const createSettlement = useMutation((body: { payerId: string; payeeId: string; amountPaise: number }) =>
     settlementsApi.create(id, body),
   )
   const invite = useMutation((email: string) => groupsApi.invite(id, email))
   const deleteExpense = useMutation((expId: string) => expensesApi.remove(expId))
+  const leaveGroupMutation = useMutation(() => groupsApi.leave(id))
+  const removeMemberMutation = useMutation((userId: string) => groupsApi.removeMember(id, userId))
 
   const members = useMemo(
     () =>
@@ -92,6 +97,39 @@ export function GroupDetailPage() {
     }
   }
 
+  const handleConfirm = async () => {
+    if (!confirmAction) return
+    try {
+      await confirmAction()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Action failed', 'error' as never)
+    } finally {
+      setConfirmOpen(false)
+      setConfirmAction(null)
+    }
+  }
+
+  const handleLeaveGroup = () => {
+    setConfirmMessage('Are you sure you want to leave this group?')
+    setConfirmAction(async () => {
+      await leaveGroupMutation.mutate()
+      addToast('You have left the group', 'success')
+      navigate('/groups')
+    })
+    setConfirmOpen(true)
+  }
+
+  const handleRemoveMember = (memberName: string, memberUserId: string) => {
+    setConfirmMessage(`Remove ${memberName} from this group?`)
+    setConfirmAction(async () => {
+      await removeMemberMutation.mutate(memberUserId)
+      addToast(`${memberName} removed`, 'success')
+      group.refetch()
+      balances.refetch()
+    })
+    setConfirmOpen(true)
+  }
+
   if (group.loading) {
     return (
       <div className="flex flex-col gap-lg max-w-content">
@@ -119,14 +157,14 @@ export function GroupDetailPage() {
             </div>
           </div>
           <div className="flex gap-sm">
-            <Button variant="secondary" onClick={() => setInviteOpen(true)}>
-              <span className="material-symbols-outlined text-[18px]">person_add</span> Invite
+            <Button variant="secondary" onClick={() => setInviteOpen(true)} className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] leading-none">person_add</span> Invite
             </Button>
-            <Button variant="secondary" onClick={() => navigate(`/expenses/add?group=${g.id}`)}>
-              <span className="material-symbols-outlined text-[18px]">add</span> Add Expense
+            <Button variant="secondary" onClick={() => navigate(`/expenses/add?group=${g.id}`)} className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] leading-none">add</span> Add Expense
             </Button>
-            <Button onClick={() => setSettleOpen(true)}>
-              <span className="material-symbols-outlined text-[18px]">payments</span> Settle Up
+            <Button onClick={() => setSettleOpen(true)} className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] leading-none">payments</span> Settle Up
             </Button>
           </div>
         </div>
@@ -157,12 +195,30 @@ export function GroupDetailPage() {
                 <BlobAvatar userId={m.userId} name={m.name} size={36} />
                 <span className="font-label-md text-label-md text-on-surface">{m.name}{m.userId === user?.id ? ' (You)' : ''}</span>
               </div>
-              <span className={`font-label-md text-label-md ${m.netPaise > 0 ? 'text-primary' : m.netPaise < 0 ? 'text-error' : 'text-on-surface-variant'}`}>
-                {formatMoney(m.netPaise)}
-              </span>
+              <div className="flex items-center gap-md">
+                <span className={`font-label-md text-label-md ${m.netPaise > 0 ? 'text-success' : m.netPaise < 0 ? 'text-error' : 'text-on-surface-variant'}`}>
+                  {formatMoney(m.netPaise)}
+                </span>
+                {g.createdBy === user?.id && m.userId !== user?.id && (
+                  <button
+                    onClick={() => handleRemoveMember(m.name, m.userId)}
+                    className="text-on-surface-variant hover:text-error p-xs transition-colors"
+                    aria-label={`Remove ${m.name}`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
+        {g.createdBy !== user?.id && (
+          <div className="mt-lg pt-md border-t border-line/40">
+            <Button variant="danger" onClick={handleLeaveGroup} disabled={leaveGroupMutation.loading}>
+              <span className="material-symbols-outlined text-[18px]">logout</span> Leave Group
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Expenses */}
@@ -274,6 +330,17 @@ export function GroupDetailPage() {
           <div className="flex justify-end gap-md">
             <Button variant="secondary" onClick={() => setInviteOpen(false)}>Cancel</Button>
             <Button onClick={handleInvite} disabled={invite.loading}>Send Invite</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Confirm modal */}
+      <Modal isOpen={confirmOpen} onClose={() => { setConfirmOpen(false); setConfirmAction(null) }} title="Confirm">
+        <div className="flex flex-col gap-lg">
+          <p className="font-body-md text-body-md text-on-surface">{confirmMessage}</p>
+          <div className="flex justify-end gap-md">
+            <Button variant="secondary" onClick={() => { setConfirmOpen(false); setConfirmAction(null) }}>Cancel</Button>
+            <Button variant="danger" onClick={handleConfirm} disabled={leaveGroupMutation.loading || removeMemberMutation.loading}>Confirm</Button>
           </div>
         </div>
       </Modal>

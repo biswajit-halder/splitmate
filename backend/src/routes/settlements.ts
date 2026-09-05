@@ -27,6 +27,55 @@ async function assertMember(c: Parameters<typeof requireAuth>[0], groupId: strin
   if (!membership) throw new ForbiddenError('You are not an active member of this group')
 }
 
+settlementRoutes.get('/', async (c) => {
+  const userId = c.get('userId')
+  const { DB } = c.env
+
+  const rows = await DB.prepare(
+    `SELECT s.id, s.group_id, s.payer_id, s.payee_id, s.amount_paise, s.method, s.status, s.note, s.created_at,
+            g.name AS group_name,
+            pu.name AS payer_name, eu.name AS payee_name
+     FROM settlements s
+     JOIN groups g ON g.id = s.group_id
+     JOIN users pu ON pu.id = s.payer_id
+     JOIN users eu ON eu.id = s.payee_id
+     WHERE s.payer_id = ? OR s.payee_id = ?
+     ORDER BY s.created_at DESC`
+  )
+    .bind(userId, userId)
+    .all<{
+      id: string
+      group_id: string
+      group_name: string
+      payer_id: string
+      payer_name: string
+      payee_id: string
+      payee_name: string
+      amount_paise: number
+      method: string | null
+      status: string
+      note: string | null
+      created_at: string
+    }>()
+
+  return c.json({
+    settlements: rows.results.map((r) => ({
+      id: r.id,
+      groupId: r.group_id,
+      groupName: r.group_name,
+      fromUserId: r.payer_id,
+      fromUserName: r.payer_name,
+      toUserId: r.payee_id,
+      toUserName: r.payee_name,
+      amountPaise: r.amount_paise,
+      method: r.method,
+      note: r.note,
+      status: r.status,
+      createdAt: r.created_at,
+    })),
+  })
+})
+
 settlementRoutes.get('/groups/:id/settlements', async (c) => {
   const groupId = c.req.param('id')
   await assertMember(c, groupId)

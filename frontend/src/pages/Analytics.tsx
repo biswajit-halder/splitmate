@@ -42,7 +42,7 @@ export function AnalyticsPage() {
         </Card>
         <Card>
           <p className="font-label-sm text-label-sm text-on-surface-variant">Settled</p>
-          <p className="font-headline-sm text-headline-sm text-primary">{trend.loading ? '…' : formatMoney(thisMonth?.settledPaise ?? 0)}</p>
+          <p className="font-headline-sm text-headline-sm text-success">{trend.loading ? '…' : formatMoney(thisMonth?.settledPaise ?? 0)}</p>
         </Card>
         <Card>
           <p className="font-label-sm text-label-sm text-on-surface-variant">Unsettled</p>
