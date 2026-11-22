@@ -1,12 +1,26 @@
+import { useMemo, useState } from 'react'
 import { useApi } from '../hooks/useApi'
 import { analyticsApi } from '../lib/api/analytics'
 import { formatMoney } from '../lib/money'
 import { formatMonth } from '../lib/dates'
-import { Skeleton } from '../components/ui'
+import { Button, Skeleton } from '../components/ui'
+
+function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
 
 export function AnalyticsPage() {
-  const trend = useApi(() => analyticsApi.trend(6))
-  const breakdown = useApi(() => analyticsApi.breakdown())
+  const defaults = useMemo(() => {
+    const now = new Date()
+    const from = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+    return { from: monthKey(from), to: monthKey(now) }
+  }, [])
+  const [from, setFrom] = useState(defaults.from)
+  const [to, setTo] = useState(defaults.to)
+
+  const trend = useApi(() => analyticsApi.trend(24, from, to), [from, to])
+  const balance = useApi(() => analyticsApi.balanceHistory(24), [])
+  const breakdown = useApi(() => analyticsApi.breakdown(), [])
 
   const months = trend.data?.months ?? []
   const spend = months.map(m => m.totalPaise)
@@ -18,11 +32,46 @@ export function AnalyticsPage() {
   const groups = breakdown.data?.byGroup ?? []
   const largest = breakdown.data?.largestExpenses ?? []
 
+  const balancePoints = balance.data?.months ?? []
+  const balanceMax = Math.max(1, ...balancePoints.map(m => Math.abs(m.netPaise)))
+  const balanceLine = balancePoints
+    .map((m, i) => {
+      const x = balancePoints.length === 1 ? 50 : (i / (balancePoints.length - 1)) * 100
+      const y = 60 - ((m.netPaise + balanceMax) / (2 * balanceMax)) * 50
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
+
+  const setPreset = (count: number) => {
+    const now = new Date()
+    setFrom(monthKey(new Date(now.getFullYear(), now.getMonth() - (count - 1), 1)))
+    setTo(monthKey(now))
+  }
+
   return (
     <div className="flex flex-col">
       <p className="micro-label mb-2">Insights</p>
       <h1 className="font-headline-lg text-on-surface">Where it went</h1>
-      <p className="mt-xs font-body-md text-on-surface-variant">Six months of shared spending, at a glance.</p>
+      <p className="mt-xs font-body-md text-on-surface-variant">Shared spending and your position over time.</p>
+
+      {/* Range controls */}
+      <div className="mt-lg flex flex-wrap items-end gap-md">
+        <div className="flex flex-col gap-xs">
+          <label className="micro-label" htmlFor="from-month">From</label>
+          <input id="from-month" type="month" value={from} onChange={e => setFrom(e.target.value)}
+            className="h-10 rounded-xl border border-line bg-surface px-md font-body-sm text-on-surface outline-none focus:border-primary" />
+        </div>
+        <div className="flex flex-col gap-xs">
+          <label className="micro-label" htmlFor="to-month">To</label>
+          <input id="to-month" type="month" value={to} onChange={e => setTo(e.target.value)}
+            className="h-10 rounded-xl border border-line bg-surface px-md font-body-sm text-on-surface outline-none focus:border-primary" />
+        </div>
+        <div className="flex gap-sm">
+          {[3, 6, 12].map(n => (
+            <Button key={n} variant="secondary" onClick={() => setPreset(n)} className="h-10 px-md">{n}m</Button>
+          ))}
+        </div>
+      </div>
 
       {/* Centrepiece chart */}
       <div className="glass-card relative mt-xl overflow-hidden p-xl md:p-xxl">
@@ -48,24 +97,50 @@ export function AnalyticsPage() {
           <div className="relative mt-xl flex h-56 items-end gap-sm md:gap-md">
             <div className="absolute inset-x-0 top-0 h-px bg-line" />
             <div className="absolute inset-x-0 top-1/2 h-px bg-line/50" />
-            {months.map((m, i) => (
+            {months.map(m => (
               <div key={m.month} className="group flex h-full flex-1 flex-col items-center justify-end gap-sm">
                 <div className="relative flex w-full flex-1 items-end justify-center gap-1">
                   <div
                     className="w-1/2 max-w-12 rounded-t-lg bg-gradient-to-t from-primary/30 to-primary shadow-[0_0_22px_rgba(255,107,94,0.25)] transition-all duration-500 group-hover:from-primary/50"
-                    style={{ height: `${Math.max(4, ((spend[i] ?? 0) / maxSpend) * 100)}%` }}
-                    title={`Spent: ${formatMoney(spend[i] ?? 0)}`}
+                    style={{ height: `${Math.max(4, ((spend[months.indexOf(m)] ?? 0) / maxSpend) * 100)}%` }}
                   />
                   <div
                     className="w-1/2 max-w-12 rounded-t-lg bg-gradient-to-t from-secondary/25 to-secondary shadow-[0_0_18px_rgba(95,224,192,0.2)] transition-all duration-500"
-                    style={{ height: `${Math.max(2, ((settled[i] ?? 0) / maxSpend) * 100)}%` }}
-                    title={`Settled: ${formatMoney(settled[i] ?? 0)}`}
+                    style={{ height: `${Math.max(2, ((settled[months.indexOf(m)] ?? 0) / maxSpend) * 100)}%` }}
                   />
                 </div>
-                <span className="font-label-sm text-on-surface-variant">{new Date(`${m}-01`).toLocaleString('en-IN', { month: 'short' })}</span>
+                <span className="font-label-sm text-on-surface-variant">{new Date(`${m.month}-01`).toLocaleString('en-IN', { month: 'short' })}</span>
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Balance over time */}
+      <div className="glass-card mt-xl p-xl md:p-xxl">
+        <div className="flex flex-wrap items-end justify-between gap-md">
+          <div>
+            <h2 className="font-headline-sm text-on-surface">Your position over time</h2>
+            <p className="mt-xs font-body-sm text-on-surface-variant">Net balance at the end of each month</p>
+          </div>
+          <p className={`num font-headline-md ${(balancePoints[balancePoints.length - 1]?.netPaise ?? 0) >= 0 ? 'text-secondary glow-mint' : 'text-primary glow-coral'}`}>
+            {formatMoney(balancePoints[balancePoints.length - 1]?.netPaise ?? 0)}
+          </p>
+        </div>
+        {balance.loading ? <Skeleton height={160} /> : balanceLine ? (
+          <svg viewBox="0 0 100 70" preserveAspectRatio="none" className="mt-lg h-44 w-full">
+            <defs>
+              <linearGradient id="balance-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <line x1="0" y1="35" x2="100" y2="35" stroke="var(--color-line)" strokeWidth="0.3" />
+            <polygon points={`0,70 ${balanceLine} 100,70`} fill="url(#balance-fill)" />
+            <polyline points={balanceLine} fill="none" stroke="var(--color-primary)" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
+          </svg>
+        ) : (
+          <p className="mt-lg font-body-md text-on-surface-variant">No history yet.</p>
         )}
       </div>
 

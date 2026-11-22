@@ -3,9 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useApi, useMutation } from '../hooks/useApi'
 import { expensesApi } from '../lib/api/expenses'
 import { formatMoney } from '../lib/money'
-import { formatDate } from '../lib/dates'
+import { formatDate, relativeTime } from '../lib/dates'
 import { Skeleton, Button } from '../components/ui'
 import { useToast } from '../components/ui'
+import { useAuth } from '../context/AuthContext'
 
 const CATEGORY_ICONS: Record<string, string> = {
   Food: 'restaurant',
@@ -20,9 +21,14 @@ export function ExpenseDetailsPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const { addToast } = useToast()
+  const { user } = useAuth()
   const { data, loading, refetch } = useApi(() => expensesApi.get(id), [id])
   const remove = useMutation((eid: string) => expensesApi.remove(eid))
   const restore = useMutation((eid: string) => expensesApi.restore(eid))
+  const comments = useApi(() => expensesApi.comments(id), [id])
+  const addComment = useMutation((body: string) => expensesApi.addComment(id, body))
+  const deleteComment = useMutation((commentId: string) => expensesApi.removeComment(id, commentId))
+  const [draft, setDraft] = useState('')
   const [deleted, setDeleted] = useState(false)
 
   const handleDelete = async () => {
@@ -109,6 +115,65 @@ export function ExpenseDetailsPage() {
               <span className="font-label-md text-label-md text-on-surface">{formatMoney(s.amountPaise, data.currency)}</span>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="surface-card p-xl">
+        <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Discussion</h3>
+        <div className="flex flex-col gap-sm">
+          {(comments.data ?? []).map(c => (
+            <div key={c.id} className="flex items-start gap-md rounded-xl bg-surface-container-low p-md">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-container font-label-sm text-on-primary-container">
+                {c.userName.split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-label-md text-on-surface">{c.userName}</p>
+                <p className="font-body-md text-on-surface-variant">{c.body}</p>
+              </div>
+              <div className="flex flex-col items-end gap-xs">
+                <span className="font-body-sm text-on-surface-variant">{relativeTime(c.createdAt)}</span>
+                {c.userId === user?.id && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await deleteComment.mutate(c.id)
+                        comments.refetch()
+                      } catch (err) {
+                        addToast(err instanceof Error ? err.message : 'Could not delete comment', 'error')
+                      }
+                    }}
+                    aria-label="Delete comment"
+                    className="text-on-surface-variant hover:text-primary"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          {(comments.data?.length ?? 0) === 0 && <p className="font-body-sm text-on-surface-variant">No comments yet.</p>}
+        </div>
+        <div className="mt-lg flex gap-sm">
+          <input
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            placeholder="Add a comment…"
+            className="h-11 flex-1 rounded-xl border border-line bg-surface-container-low/80 px-md font-body-md outline-none focus:border-primary"
+          />
+          <Button
+            disabled={!draft.trim() || addComment.loading}
+            onClick={async () => {
+              try {
+                await addComment.mutate(draft.trim())
+                setDraft('')
+                comments.refetch()
+              } catch (err) {
+                addToast(err instanceof Error ? err.message : 'Could not post comment', 'error')
+              }
+            }}
+          >
+            Post
+          </Button>
         </div>
       </div>
     </div>

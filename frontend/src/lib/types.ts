@@ -23,6 +23,9 @@ export interface Group {
   iconColor: string | null
   type: string | null
   currency: string
+  accent: string | null
+  hasPhoto: boolean
+  role: 'owner' | 'admin' | 'member'
   createdBy: string
   balancePaise: number
   memberCount: number
@@ -36,6 +39,7 @@ export interface GroupMember {
   name: string
   email: string
   avatarBg: string | null
+  role: 'owner' | 'admin' | 'member'
 }
 
 export interface GroupDetail {
@@ -46,6 +50,9 @@ export interface GroupDetail {
   iconColor: string | null
   type: string | null
   currency: string
+  accent: string | null
+  photoKey: string | null
+  role: 'owner' | 'admin' | 'member'
   createdBy: string
   createdByName: string
   members: GroupMember[]
@@ -89,6 +96,14 @@ export interface ExpenseSplit {
   weight: number | null
   settled: number
   name: string
+}
+
+export interface ExpenseComment {
+  id: string
+  body: string
+  createdAt: string
+  userId: string
+  userName: string
 }
 
 export interface ExpenseDetail {

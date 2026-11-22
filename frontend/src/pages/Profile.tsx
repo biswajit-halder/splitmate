@@ -54,6 +54,7 @@ export function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [emailConfirmPassword, setEmailConfirmPassword] = useState('')
+  const [digestEnabled, setDigestEnabled] = useState(true)
 
   useEffect(() => {
     setEmail(user?.email ?? '')
@@ -247,6 +248,25 @@ export function ProfilePage() {
           <span className="font-label-md text-on-surface">Theme</span>
           <span className="font-label-md text-on-surface-variant">Night Market / Daylight</span>
         </div>
+        <label className="flex items-center justify-between rounded-xl bg-surface-container-low p-md">
+          <span className="font-label-md text-on-surface">Monthly email digest</span>
+          <input
+            type="checkbox"
+            checked={digestEnabled}
+            onChange={async e => {
+              const next = e.target.checked
+              setDigestEnabled(next)
+              try {
+                await usersApi.patchMe({ digest_enabled: next })
+                addToast('Digest preference saved', 'success')
+              } catch {
+                setDigestEnabled(!next)
+                addToast('Could not save preference', 'error')
+              }
+            }}
+            className="h-5 w-5 accent-[var(--color-primary)]"
+          />
+        </label>
       </div>
 
       {/* Section 5: Log Out */}

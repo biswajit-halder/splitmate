@@ -72,12 +72,15 @@ app.route('/api', analyticsRoutes)
  * email webhook configured.
  */
 export const scheduled = async (
-  _controller: ScheduledController,
+  controller: ScheduledController,
   env: Bindings,
   _ctx: ExecutionContext
 ): Promise<void> => {
   if (!env.DB || !env.EMAIL_WEBHOOK_URL) return
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const now = new Date()
+
+  // Daily: nudge payees about settlements waiting over a day.
+  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
   const pending = await env.DB.prepare(
     `SELECT s.id, s.amount_paise, u.email
      FROM settlements s JOIN users u ON u.id = s.payee_id
@@ -91,7 +94,30 @@ export const scheduled = async (
       env,
       settlement.email,
       'Settlement awaiting confirmation',
-      `A payment of ${settlement.amount_paise / 100} INR is waiting for your confirmation in SplitMate.`
+      `A payment is waiting for your confirmation in SplitMate (${(settlement.amount_paise / 100).toFixed(2)}).`
+    )
+  }
+
+  // Monthly digest on the 1st at 09:00 UTC.
+  if (now.getUTCDate() !== 1 || now.getUTCHours() !== 9) return
+  const users = await env.DB.prepare('SELECT id, email FROM users WHERE digest_enabled = 1')
+    .all<{ id: string; email: string }>()
+  for (const user of users.results) {
+    const rows = await env.DB.prepare(
+      `SELECT COALESCE(SUM(CASE WHEN user_id = ? THEN net_amount_paise ELSE -net_amount_paise END), 0) AS net
+       FROM balances WHERE user_id = ? OR counterpart_id = ?`
+    ).bind(user.id, user.id, user.id).first<{ net: number }>()
+    const pendingCount = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM settlements WHERE (payer_id = ? OR payee_id = ?) AND status = 'pending'"
+    ).bind(user.id, user.id).first<{ count: number }>()
+    const month = new Date(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)
+      .toLocaleString('en-US', { month: 'long', year: 'numeric' })
+    await sendEmail(
+      env,
+      user.email,
+      `Your SplitMate digest — ${month}`,
+      `Net position: ${((rows?.net ?? 0) / 100).toFixed(2)}. ` +
+      `Pending settlements: ${pendingCount?.count ?? 0}. Open SplitMate to review your groups.`
     )
   }
 }

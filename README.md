@@ -10,6 +10,8 @@ Bill splitting and expense tracking app.
 - **Accent signal**: pick **Ember**, **Ultra** or **Mint** in the sidebar or Profile. The choice is stored in `localStorage` and drives every accent surface at runtime through CSS variables.
 - **Layout**: group-first canvas — a statement header, a typographic balance "pulse strip" with six-month sparklines, vivid group covers, an activity timeline and a pairwise settle board with a settlement-progress gauge. Group detail uses an expense **ledger** with a sticky balances rail instead of a stack of cards.
 - **Interaction**: command bar with `⌘K` / `Ctrl+K` search, a LIVE activity indicator, responsive bottom navigation on mobile, and full `prefers-reduced-motion` support.
+- **Features**: equal / exact / percent / **shares** splits, one-tap **Settle all** (fewest payments), shareable group invite links, **owner/admin/member** roles, expense comments, group photos and cover colours, date-range analytics, a balance-over-time chart, email-code sign-in and a monthly email digest.
+- Group photos are stored as data URLs in D1 (500 KB limit) so no object storage is required. Email features need the webhook secret described below.
 
 ## Tech Stack
 
@@ -126,7 +128,7 @@ pending for more than 24 hours.
 ```bash
 cd backend
 npm run typecheck
-npm test              # 50 tests across 9 files (Vitest + Workers pool)
+npm test              # 63 tests across 11 files (Vitest + Workers pool)
 
 cd ../frontend
 npx tsc --noEmit

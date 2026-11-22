@@ -37,6 +37,11 @@ export function GroupDetailPage() {
 
   const [settleOpen, setSettleOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [inviteLink, setInviteLink] = useState('')
+  const [accent, setAccent] = useState('#FF6B5E')
+  const [photo, setPhoto] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmAction, setConfirmAction] = useState<(() => Promise<void>) | null>(null)
@@ -46,6 +51,8 @@ export function GroupDetailPage() {
   const deleteExpense = useMutation((expId: string) => expensesApi.remove(expId))
   const leaveGroup = useMutation(() => groupsApi.leave(id))
   const removeMember = useMutation((userId: string) => groupsApi.removeMember(id, userId))
+  const setRole = useMutation((userId: string, role: 'admin' | 'member') => groupsApi.setMemberRole(id, userId, role))
+  const settleAll = useMutation(() => settlementsApi.settleAll(id))
 
   const members = useMemo(
     () => (balances.data?.members ?? group.data?.members ?? [])
@@ -99,15 +106,78 @@ export function GroupDetailPage() {
     setConfirmOpen(true)
   }
 
+  const createLink = async () => {
+    try {
+      setBusy(true)
+      const res = await groupsApi.createInviteLink(id)
+      setInviteLink(res.url)
+      addToast('Invite link created', 'success')
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Could not create link', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleSettleAll = async () => {
+    try {
+      setBusy(true)
+      const res = await settleAll.mutate()
+      addToast(`${res.created} settlement${res.created === 1 ? '' : 's'} created`, 'success')
+      settlements.refetch()
+      balances.refetch()
+      simplified.refetch()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Could not settle up', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const pickPhoto = (file?: File) => {
+    if (!file) return
+    if (!file.type.startsWith('image/') || file.size > 500000) {
+      addToast('Choose an image under 500 KB', 'error')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => setPhoto(String(reader.result))
+    reader.readAsDataURL(file)
+  }
+
+  const saveSettings = async () => {
+    try {
+      setBusy(true)
+      await groupsApi.updateSettings(id, { accent, ...(photo ? { photo } : {}) })
+      addToast('Group updated', 'success')
+      setSettingsOpen(false)
+      group.refetch()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Could not save settings', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (group.loading) return <div className="flex flex-col gap-lg"><Skeleton height={60} /><Skeleton height={260} /></div>
   if (!group.data) return <p className="font-body-md text-on-surface-variant">Group not found.</p>
 
   const g = group.data
-  const isOwner = g.createdBy === user?.id
+  const isOwner = g.role === 'owner'
+  const canManage = g.role === 'owner' || g.role === 'admin'
   const currency = g.currency ?? 'INR'
+  const rolesById = new Map((g.members ?? []).map(m => [m.userId, m.role]))
 
   return (
     <div className="flex flex-col">
+      {(g.accent || g.photoKey) && (
+        <div
+          className="mb-lg h-28 w-full rounded-2xl border border-line bg-cover bg-center"
+          style={g.photoKey
+            ? { backgroundImage: `url(/api/groups/${g.id}/photo)` }
+            : { backgroundImage: `linear-gradient(120deg, ${g.accent ?? '#FF6B5E'}, transparent 80%)` }}
+        />
+      )}
       {/* Statement header — no stat cards */}
       <div className="flex flex-col gap-lg sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -128,6 +198,11 @@ export function GroupDetailPage() {
           <Button onClick={() => setSettleOpen(true)}>
             <span className="material-symbols-outlined text-[18px]">payments</span> Settle up
           </Button>
+          {canManage && (
+            <Button variant="secondary" onClick={() => { setAccent(g.accent ?? '#FF6B5E'); setPhoto(null); setSettingsOpen(true) }} title="Group settings">
+              <span className="material-symbols-outlined text-[18px]">settings</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -202,12 +277,32 @@ export function GroupDetailPage() {
                     <p className="truncate font-label-md text-on-surface">
                       {m.name}{m.userId === user?.id ? ' (you)' : ''}
                     </p>
-                    <p className="font-body-sm text-on-surface-variant">{owed ? 'owed to them' : m.netPaise < 0 ? 'they owe' : 'settled'}</p>
+                    <p className="font-body-sm text-on-surface-variant">
+                      {owed ? 'owed to them' : m.netPaise < 0 ? 'they owe' : 'settled'}
+                      {rolesById.get(m.userId) && ` · ${rolesById.get(m.userId)}`}
+                    </p>
                   </div>
                   <span className={`num font-label-md ${owed ? 'text-secondary glow-mint' : m.netPaise < 0 ? 'text-primary glow-coral' : 'text-on-surface-variant'}`}>
                     {formatMoney(Math.abs(m.netPaise), currency)}
                   </span>
-                  {isOwner && m.userId !== user?.id && (
+                  {isOwner && m.userId !== user?.id && rolesById.get(m.userId) !== 'owner' && (
+                    <button
+                      title={rolesById.get(m.userId) === 'admin' ? 'Remove admin role' : 'Make admin'}
+                      onClick={async () => {
+                        try {
+                          await setRole.mutate(m.userId, rolesById.get(m.userId) === 'admin' ? 'member' : 'admin')
+                          addToast('Role updated', 'success')
+                          group.refetch()
+                        } catch (err) {
+                          addToast(err instanceof Error ? err.message : 'Could not change role', 'error')
+                        }
+                      }}
+                      className="text-on-surface-variant transition-colors hover:text-primary"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">{rolesById.get(m.userId) === 'admin' ? 'shield_off' : 'shield'}</span>
+                    </button>
+                  )}
+                  {canManage && m.userId !== user?.id && rolesById.get(m.userId) !== 'owner' && (
                     <button
                       onClick={() => ask(`Remove ${m.name} from this group?`, async () => {
                         await removeMember.mutate(m.userId)
@@ -245,6 +340,10 @@ export function GroupDetailPage() {
                   </div>
                 ))}
               </div>
+              <Button className="mt-md w-full" onClick={handleSettleAll} disabled={busy}>
+                <span className="material-symbols-outlined text-[18px]">bolt</span>
+                {busy ? 'Working…' : 'Settle all in one tap'}
+              </Button>
             </div>
           )}
           {!isOwner && (
@@ -279,12 +378,61 @@ export function GroupDetailPage() {
               placeholder="friend@example.com"
               className="h-11 w-full rounded-xl border border-line bg-surface-container-low/80 px-md font-body-md outline-none focus:border-primary" />
           </div>
+          {canManage && (
+            <div className="border-t border-line pt-lg">
+              <p className="micro-label mb-sm">Or share a join link</p>
+              {inviteLink ? (
+                <div className="flex items-center gap-sm">
+                  <input readOnly value={inviteLink} className="h-10 flex-1 rounded-lg border border-line bg-surface-container-low px-sm font-body-sm text-on-surface-variant" />
+                  <Button variant="secondary" onClick={() => { navigator.clipboard?.writeText(inviteLink); addToast('Link copied', 'success') }}>Copy</Button>
+                </div>
+              ) : (
+                <Button variant="secondary" onClick={createLink} disabled={busy}>Create link</Button>
+              )}
+            </div>
+          )}
           <div className="flex justify-end gap-md">
             <Button variant="secondary" onClick={() => setInviteOpen(false)}>Cancel</Button>
             <Button onClick={handleInvite} disabled={invite.loading}>Send invite</Button>
           </div>
         </div>
       </Modal>
+
+      {canManage && (
+        <Modal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} title="Group settings" subtitle="Make this circle yours.">
+          <div className="flex flex-col gap-xl">
+            <div>
+              <p className="micro-label mb-sm">Cover colour</p>
+              <div className="flex flex-wrap gap-sm">
+                {['#FF6B5E', '#B69CFF', '#5FE0C0', '#FFC857', '#3F6B74', '#A4657A'].map(color => (
+                  <button
+                    key={color}
+                    onClick={() => setAccent(color)}
+                    aria-label={`Colour ${color}`}
+                    className={`h-10 w-10 rounded-xl border-2 transition-all ${accent === color ? 'border-on-surface scale-110' : 'border-transparent'}`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="micro-label mb-sm">Cover photo</p>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={e => pickPhoto(e.target.files?.[0])}
+                className="w-full font-body-sm text-on-surface-variant file:mr-sm file:rounded-lg file:border-0 file:bg-primary-container file:px-md file:py-2 file:font-label-md file:text-on-primary-container"
+              />
+              {g.photoKey && <p className="mt-sm font-body-sm text-on-surface-variant">A photo is currently set.</p>}
+              {photo && <img src={photo} alt="Preview" className="mt-sm h-24 w-full rounded-xl object-cover" />}
+            </div>
+            <div className="flex justify-end gap-md">
+              <Button variant="secondary" onClick={() => setSettingsOpen(false)}>Cancel</Button>
+              <Button onClick={saveSettings} disabled={busy}>{busy ? 'Saving…' : 'Save settings'}</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       <Modal isOpen={confirmOpen} onClose={() => { setConfirmOpen(false); setConfirmAction(null) }}
         title="Are you sure?" subtitle={confirmMessage}>

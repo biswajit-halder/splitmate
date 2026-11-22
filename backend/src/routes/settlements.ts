@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { BadRequestError, ForbiddenError, NotFoundError } from '../errors/AppError'
-import { computeNet, type BalanceRow } from '../lib/balances'
+import { computeNet, simplifyDebts, type BalanceRow } from '../lib/balances'
 import { assertActiveMembers } from '../lib/membership'
 import { requireAuth } from '../middleware/auth'
 import type { AppEnv } from '../types'
@@ -149,6 +149,55 @@ async function getOutstandingPaise(
 
   return Math.max(0, outstanding - (pending?.total ?? 0))
 }
+
+/**
+ * Create settlements for every simplified transfer in one batch. The caller's
+ * own side is auto-confirmed; other parties still need to confirm theirs.
+ */
+settlementRoutes.post('/groups/:id/settlements/settle-all', async (c) => {
+  const groupId = c.req.param('id')
+  await assertMember(c, groupId)
+  const userId = c.get('userId')
+  const { DB } = c.env
+
+  const rows = await DB.prepare(
+    'SELECT user_id, counterpart_id, net_amount_paise FROM balances WHERE group_id = ?'
+  ).bind(groupId).all<BalanceRow>()
+  const net = computeNet(rows.results)
+
+  // Pending settlements will reduce their payer's obligation once confirmed.
+  const pending = await DB.prepare(
+    "SELECT payer_id, amount_paise FROM settlements WHERE group_id = ? AND status = 'pending'"
+  ).bind(groupId).all<{ payer_id: string; amount_paise: number }>()
+  for (const p of pending.results) {
+    net.set(p.payer_id, (net.get(p.payer_id) ?? 0) + p.amount_paise)
+  }
+
+  const transfers = simplifyDebts(net).filter(t => t.amountPaise > 0)
+  if (transfers.length === 0) throw new BadRequestError('There is nothing to settle in this group')
+
+  const statements: D1PreparedStatement[] = []
+  for (const t of transfers) {
+    const id = newId()
+    const payerConfirmed = t.from === userId ? 1 : 0
+    const payeeConfirmed = t.to === userId ? 1 : 0
+    statements.push(
+      DB.prepare(
+        `INSERT INTO settlements (id, group_id, payer_id, payee_id, amount_paise, method, status, payer_confirmed, payee_confirmed, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?, ?)`
+      ).bind(id, groupId, t.from, t.to, t.amountPaise, payerConfirmed, payeeConfirmed, nowIso(), nowIso())
+    )
+    if (t.to !== userId) {
+      statements.push(
+        DB.prepare(
+          'INSERT INTO notifications (id, user_id, title, body, type, ref_id, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?)'
+        ).bind(newId(), t.to, 'Settlement awaiting confirmation', 'Confirm this settlement', 'settlement', id, nowIso())
+      )
+    }
+  }
+  await DB.batch(statements)
+  return c.json({ created: transfers.length }, 201)
+})
 
 settlementRoutes.post('/groups/:id/settlements', async (c) => {
   const groupId = c.req.param('id')

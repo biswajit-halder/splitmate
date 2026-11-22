@@ -10,6 +10,7 @@ import { nowIso } from '../utils/ids'
 const patchSchema = z.object({
   name: z.string().min(1).max(80).optional(),
   avatar_bg: z.string().optional(),
+  digest_enabled: z.boolean().optional(),
 })
 
 const changeEmailSchema = z.object({
@@ -45,8 +46,8 @@ userRoutes.patch('/me', async (c) => {
   if (!current) throw new NotFoundError('User not found')
   const name = body.name ?? current.name
   const avatarBg = body.avatar_bg ?? current.avatar_bg
-  await c.env.DB.prepare('UPDATE users SET name = ?, avatar_bg = ?, updated_at = ? WHERE id = ?')
-    .bind(name, avatarBg, nowIso(), userId)
+  await c.env.DB.prepare('UPDATE users SET name = ?, avatar_bg = ?, digest_enabled = COALESCE(?, digest_enabled), updated_at = ? WHERE id = ?')
+    .bind(name, avatarBg, body.digest_enabled === undefined ? null : (body.digest_enabled ? 1 : 0), nowIso(), userId)
     .run()
   return c.json({ user: { id: userId, name, avatar_bg: avatarBg } })
 })

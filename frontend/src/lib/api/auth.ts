@@ -23,4 +23,8 @@ export const authApi = {
     http.post<{ ok: true; devToken?: string }>('/auth/forgot-password', { email }),
   resetPassword: (token: string, password: string) =>
     http.post<{ ok: true }>('/auth/reset-password', { token, password }),
+  sendEmailCode: (email: string) =>
+    http.post<{ ok: true; devCode?: string }>('/auth/email/code', { email }),
+  verifyEmailCode: (email: string, code: string) =>
+    http.post<AuthResult>('/auth/email/verify', { email, code }),
 }

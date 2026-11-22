@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { authApi } from '../lib/api/auth'
 import { ApiError } from '../lib/api/client'
-import { useToast, PasswordInput, AuthDivider, BrandMark } from '../components/ui'
+import { useToast, PasswordInput, AuthDivider, BrandMark, Button } from '../components/ui'
 
 function GoogleIcon() {
   return (
@@ -18,6 +18,7 @@ function GoogleIcon() {
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
   const { setSession } = useAuth()
   const { addToast } = useToast()
   const [email, setEmail] = useState('')
@@ -26,6 +27,13 @@ export function LoginPage() {
   const [error, setError] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
+  const [codeMode, setCodeMode] = useState(false)
+  const [codeEmail, setCodeEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [codeSent, setCodeSent] = useState(false)
+  const [devCode, setDevCode] = useState<string | null>(null)
+  const [codeError, setCodeError] = useState('')
+  const [codeLoading, setCodeLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,7 +53,7 @@ export function LoginPage() {
       const res = await authApi.login({ email: email.trim(), password, remember: rememberMe })
       setSession(res.user)
       addToast(`Welcome back, ${res.user.name}`, 'success')
-      navigate('/dashboard')
+      navigate(params.get('next') || '/dashboard')
     } catch (err) {
       if (err instanceof ApiError && err.details) {
         setError(err.details.email ?? err.details.password ?? err.message)
@@ -185,6 +193,78 @@ export function LoginPage() {
               <GoogleIcon />
               Google Login
             </button>
+
+            <div className="mt-lg border-t border-line pt-lg">
+              {!codeMode ? (
+                <button type="button" onClick={() => setCodeMode(true)} className="w-full text-center font-label-md text-primary hover:opacity-70">
+                  Sign in or register with an email code →
+                </button>
+              ) : (
+                <div className="flex flex-col gap-sm">
+                  <p className="micro-label">Email code sign-in</p>
+                  {codeError && <p className="tint-coral rounded-lg px-sm py-xs font-body-sm">{codeError}</p>}
+                  {devCode && <p className="tint-saffron rounded-lg px-sm py-xs font-body-sm">Dev code: {devCode}</p>}
+                  <div className="flex gap-sm">
+                    <input
+                      type="email"
+                      value={codeEmail}
+                      onChange={e => setCodeEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="h-11 flex-1 rounded-xl border border-line bg-surface px-md font-body-sm outline-none focus:border-primary"
+                    />
+                    <Button
+                      variant="secondary"
+                      disabled={codeLoading || !codeEmail.trim()}
+                      onClick={async () => {
+                        setCodeLoading(true)
+                        setCodeError('')
+                        try {
+                          const res = await authApi.sendEmailCode(codeEmail.trim())
+                          setCodeSent(true)
+                          if (res.devCode) setDevCode(res.devCode)
+                        } catch (err) {
+                          setCodeError(err instanceof Error ? err.message : 'Could not send the code')
+                        } finally {
+                          setCodeLoading(false)
+                        }
+                      }}
+                    >
+                      {codeSent ? 'Resend' : 'Send code'}
+                    </Button>
+                  </div>
+                  {codeSent && (
+                    <div className="flex gap-sm">
+                      <input
+                        value={code}
+                        onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        inputMode="numeric"
+                        placeholder="6-digit code"
+                        className="h-11 flex-1 rounded-xl border border-line bg-surface px-md font-body-sm tracking-widest outline-none focus:border-primary"
+                      />
+                      <Button
+                        disabled={codeLoading || code.length !== 6}
+                        onClick={async () => {
+                          setCodeLoading(true)
+                          setCodeError('')
+                          try {
+                            const res = await authApi.verifyEmailCode(codeEmail.trim(), code)
+                            setSession(res.user)
+                            addToast(`Welcome, ${res.user.name}`, 'success')
+                            navigate(params.get('next') || '/dashboard')
+                          } catch (err) {
+                            setCodeError(err instanceof Error ? err.message : 'Invalid code')
+                          } finally {
+                            setCodeLoading(false)
+                          }
+                        }}
+                      >
+                        Verify
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Footer Link */}

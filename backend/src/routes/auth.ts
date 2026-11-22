@@ -25,6 +25,8 @@ const loginSchema = z.object({
 
 const forgotSchema = z.object({ email: z.string().email() })
 const resetSchema = z.object({ token: z.string().min(10), password: z.string().min(8) })
+const emailCodeSchema = z.object({ email: z.string().email() })
+const emailVerifySchema = z.object({ email: z.string().email(), code: z.string().regex(/^\d{6}$/) })
 
 export const authRoutes = new Hono<AppEnv>()
 
@@ -144,4 +146,68 @@ authRoutes.post('/reset-password', loginRateLimit, async (c) => {
   ])
   deleteCookie(c, COOKIE_NAME, { path: '/' })
   return c.json({ ok: true })
+})
+
+/** Send a 6-digit sign-in code. Also registers new accounts on verification. */
+authRoutes.post('/email/code', loginRateLimit, async (c) => {
+  const { email } = emailCodeSchema.parse(await c.req.json())
+  const normalized = email.toLowerCase()
+  const { DB } = c.env
+
+  const latest = await DB.prepare(
+    'SELECT created_at FROM email_codes WHERE email = ? ORDER BY created_at DESC LIMIT 1'
+  )
+    .bind(normalized)
+    .first<{ created_at: string }>()
+  if (latest && Date.now() - new Date(latest.created_at).getTime() < 45000) {
+    return c.json({ ok: true })
+  }
+
+  await DB.prepare('UPDATE email_codes SET used = 1 WHERE email = ? AND used = 0').bind(normalized).run()
+  const code = String(Math.floor(100000 + Math.random() * 900000))
+  await DB.prepare(
+    'INSERT INTO email_codes (id, email, code_hash, expires_at, attempts, used, created_at) VALUES (?, ?, ?, ?, 0, 0, ?)'
+  )
+    .bind(newId(), normalized, await hashToken(code), new Date(Date.now() + 10 * 60000).toISOString(), nowIso())
+    .run()
+
+  const sent = await sendEmail(c.env, normalized, 'Your SplitMate code', `Your sign-in code is ${code}. It expires in 10 minutes.`)
+  if (!sent && c.env.DEV_RESET_TOKEN === 'true') return c.json({ ok: true, devCode: code })
+  return c.json({ ok: true })
+})
+
+authRoutes.post('/email/verify', loginRateLimit, async (c) => {
+  const body = emailVerifySchema.parse(await c.req.json())
+  const email = body.email.toLowerCase()
+  const { DB } = c.env
+  const record = await DB.prepare(
+    'SELECT id, code_hash, expires_at, attempts FROM email_codes WHERE email = ? AND used = 0 ORDER BY created_at DESC LIMIT 1'
+  )
+    .bind(email)
+    .first<{ id: string; code_hash: string; expires_at: string; attempts: number }>()
+
+  const matches = record && (await hashToken(body.code)) === record.code_hash
+  if (!record || !matches || record.attempts >= 5 || new Date(record.expires_at).getTime() < Date.now()) {
+    if (record) await DB.prepare('UPDATE email_codes SET attempts = attempts + 1 WHERE id = ?').bind(record.id).run()
+    throw new BadRequestError('Invalid or expired code')
+  }
+
+  await DB.prepare('UPDATE email_codes SET used = 1 WHERE id = ?').bind(record.id).run()
+
+  const id = newId()
+  const name = email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase())
+  await DB.prepare(
+    'INSERT OR IGNORE INTO users (id, email, password_hash, name, avatar_bg, created_at, updated_at) VALUES (?, ?, ?, ?, NULL, ?, ?)'
+  )
+    .bind(id, email, await hashPassword(crypto.randomUUID()), name, nowIso(), nowIso())
+    .run()
+
+  const user = await DB.prepare('SELECT id, email, name, avatar_bg, token_version FROM users WHERE email = ?')
+    .bind(email)
+    .first<{ id: string; email: string; name: string; avatar_bg: string | null; token_version: number }>()
+  if (!user) throw new BadRequestError('Could not create the account')
+
+  const token = await signToken({ sub: user.id, email: user.email, ver: user.token_version ?? 0 }, c.env.JWT_SECRET)
+  setSessionCookie(c, token)
+  return c.json({ user: { id: user.id, email: user.email, name: user.name, avatar_bg: user.avatar_bg } })
 })

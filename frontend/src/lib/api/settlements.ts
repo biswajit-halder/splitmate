@@ -53,4 +53,6 @@ export const settlementsApi = {
   confirm: (id: string) =>
     http.post<{ settlement: { id: string; status: string } }>(`/settlements/${id}/confirm`),
   remove: (id: string) => http.delete<{ ok: true }>(`/settlements/${id}`),
+  settleAll: (groupId: string) =>
+    http.post<{ created: number }>(`/groups/${groupId}/settlements/settle-all`),
 }

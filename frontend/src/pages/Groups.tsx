@@ -128,7 +128,12 @@ export function GroupsPage() {
             <button
               key={group.id}
               onClick={() => navigate(`/groups/${group.id}`)}
-              className={`pressable relative flex h-48 flex-col justify-between overflow-hidden rounded-2xl p-lg text-left ${style.className} ${index === 0 ? 'sm:col-span-2 lg:col-span-1' : ''}`}
+              style={group.accent
+                ? { backgroundImage: group.hasPhoto
+                    ? `url(/api/groups/${group.id}/photo)`
+                    : `linear-gradient(135deg, ${group.accent}, color-mix(in srgb, ${group.accent} 45%, #B69CFF))` }
+                : undefined}
+              className={`pressable relative flex h-48 flex-col justify-between overflow-hidden rounded-2xl bg-cover bg-center p-lg text-left ${group.accent ? '' : style.className} ${index === 0 ? 'sm:col-span-2 lg:col-span-1' : ''}`}
             >
               <div className="flex items-start justify-between">
                 <span className="material-symbols-outlined text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>{style.icon}</span>

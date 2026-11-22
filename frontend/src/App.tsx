@@ -11,6 +11,7 @@ const LoginPage = lazy(() => import('./pages/Login').then(m => ({ default: m.Log
 const RegisterPage = lazy(() => import('./pages/Register').then(m => ({ default: m.RegisterPage })))
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPassword').then(m => ({ default: m.ForgotPasswordPage })))
 const ResetPasswordPage = lazy(() => import('./pages/ResetPassword').then(m => ({ default: m.ResetPasswordPage })))
+const JoinPage = lazy(() => import('./pages/Join').then(m => ({ default: m.JoinPage })))
 const DashboardPage = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.DashboardPage })))
 const GroupsPage = lazy(() => import('./pages/Groups').then(m => ({ default: m.GroupsPage })))
 const GroupDetailPage = lazy(() => import('./pages/GroupDetail').then(m => ({ default: m.GroupDetailPage })))
@@ -57,6 +58,7 @@ function App() {
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/join" element={<JoinPage />} />
                 <Route path="/terms" element={<StaticPage title="Terms of Service" body="Terms of service content goes here." />} />
                 <Route path="/privacy" element={<StaticPage title="Privacy Policy" body="Privacy policy content goes here." />} />
                 <Route element={<RouteGuard />}>

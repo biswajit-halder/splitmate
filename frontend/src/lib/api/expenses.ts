@@ -1,12 +1,13 @@
 import { http } from './client'
-import type { ExpenseSummary, ExpenseDetail } from '../types'
+import type { ExpenseSummary, ExpenseDetail, ExpenseComment } from '../types'
 
-export type SplitMode = 'equally' | 'exact' | 'percent'
+export type SplitMode = 'equally' | 'exact' | 'percent' | 'shares'
 
 export interface ExpenseParticipant {
   userId: string
   amountPaise?: number
   weight?: number
+  shares?: number
 }
 
 export interface CreateExpensePayload {
@@ -29,4 +30,9 @@ export const expensesApi = {
     http.patch<{ ok: true }>(`/expenses/${id}`, body),
   remove: (id: string) => http.delete<{ ok: true }>(`/expenses/${id}`),
   restore: (id: string) => http.post<{ ok: true }>(`/expenses/${id}/restore`),
+  comments: (id: string) => http.get<{ comments: ExpenseComment[] }>(`/expenses/${id}/comments`).then(r => r.comments),
+  addComment: (id: string, body: string) =>
+    http.post<{ comment: { id: string } }>(`/expenses/${id}/comments`, { body }),
+  removeComment: (id: string, commentId: string) =>
+    http.delete<{ ok: true }>(`/expenses/${id}/comments/${commentId}`),
 }

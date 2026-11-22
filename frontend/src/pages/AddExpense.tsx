@@ -3,12 +3,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApi, useMutation } from '../hooks/useApi'
 import { groupsApi } from '../lib/api/groups'
 import { expensesApi } from '../lib/api/expenses'
-import { toPaise, fromPaise } from '../lib/money'
+import { toPaise, fromPaise, formatMoney } from '../lib/money'
 import { Button, Select } from '../components/ui'
 import { useToast } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 
-type SplitMode = 'equally' | 'exact' | 'percent'
+type SplitMode = 'equally' | 'exact' | 'percent' | 'shares'
 
 const CATEGORIES = ['Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Other']
 
@@ -29,6 +29,7 @@ export function AddExpensePage() {
   const [splitMode, setSplitMode] = useState<SplitMode>('equally')
   const [exact, setExact] = useState<Record<string, string>>({})
   const [percentages, setPercentages] = useState<Record<string, string>>({})
+  const [shareValues, setShareValues] = useState<Record<string, string>>({})
 
   const editExpense = useApi(
     () => (editId ? expensesApi.get(editId) : Promise.resolve(null)),
@@ -62,6 +63,10 @@ export function AddExpensePage() {
         pctMap[s.userId] = s.weight != null ? String(s.weight) : ''
       }
       setPercentages(pctMap)
+    } else if (expense.splitMode === 'shares') {
+      const shareMap: Record<string, string> = {}
+      for (const s of expense.splits) shareMap[s.userId] = String(s.weight ?? 1)
+      setShareValues(shareMap)
     }
   }, [editExpense.data])
 
@@ -89,7 +94,7 @@ export function AddExpensePage() {
       return
     }
 
-    let participants: { userId: string; amountPaise?: number; weight?: number }[]
+    let participants: { userId: string; amountPaise?: number; weight?: number; shares?: number }[]
     if (splitMode === 'equally') {
       participants = members.map(m => ({ userId: m.userId }))
     } else if (splitMode === 'exact') {
@@ -99,6 +104,13 @@ export function AddExpensePage() {
         addToast('Exact splits must sum to the total', 'error')
         return
       }
+    } else if (splitMode === 'shares') {
+      const shares = members.map(m => Math.max(1, Math.round(Number(shareValues[m.userId]) || 1)))
+      if (shares.reduce((a, b) => a + b, 0) < 1) {
+        addToast('Enter at least one share', 'error')
+        return
+      }
+      participants = members.map((m, i) => ({ userId: m.userId, shares: shares[i] }))
     } else {
       if (!percentSumValid) {
         addToast('Percentages must total 100%', 'error')
@@ -202,7 +214,7 @@ export function AddExpensePage() {
         <div className="flex flex-col gap-xs">
           <label className="eyebrow">Split method</label>
           <div className="flex gap-sm rounded-xl bg-surface-container-low p-1">
-            {(['equally', 'exact', 'percent'] as const).map(mode => (
+            {(['equally', 'exact', 'percent', 'shares'] as const).map(mode => (
               <button
                 key={mode}
                 type="button"
@@ -267,6 +279,35 @@ export function AddExpensePage() {
             )}
           </div>
         )}
+
+        {splitMode === 'shares' && members.length > 0 && (() => {
+          const totalShares = members.reduce((s, m) => s + Math.max(1, Math.round(Number(shareValues[m.userId]) || 1)), 0)
+          return (
+            <div className="flex flex-col gap-sm">
+              {members.map(m => {
+                const share = Math.max(1, Math.round(Number(shareValues[m.userId]) || 1))
+                return (
+                  <div key={m.userId} className="flex items-center gap-md">
+                    <span className="flex-1 font-label-md text-on-surface">{m.name}</span>
+                    <span className="num w-20 text-right font-body-sm text-on-surface-variant">
+                      {formatMoney(Math.round((parseFloat(amount) || 0) * share / totalShares * 100))}
+                    </span>
+                    <div className="flex h-10 items-center rounded-lg border border-line bg-surface px-md focus-within:border-primary">
+                      <input
+                        value={shareValues[m.userId] ?? '1'}
+                        onChange={e => setShareValues(prev => ({ ...prev, [m.userId]: e.target.value }))}
+                        inputMode="numeric"
+                        className="w-12 bg-transparent text-right text-on-surface outline-none"
+                      />
+                      <span className="ml-xs text-on-surface-variant">×</span>
+                    </div>
+                  </div>
+                )
+              })}
+              <p className="font-body-sm text-on-surface-variant">Total shares: {totalShares}</p>
+            </div>
+          )
+        })()}
 
         <div className="flex justify-end gap-md">
           <Button variant="secondary" type="button" onClick={() => navigate(-1)}>Cancel</Button>

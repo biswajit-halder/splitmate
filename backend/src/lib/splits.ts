@@ -1,17 +1,18 @@
 import { BadRequestError } from '../errors/AppError'
 
-export type SplitMode = 'equally' | 'exact' | 'percent'
+export type SplitMode = 'equally' | 'exact' | 'percent' | 'shares'
 
 export interface SplitInput {
   amountPaise: number
   mode: SplitMode
-  participants: Array<{ userId: string; amountPaise?: number; weight?: number }>
+  participants: Array<{ userId: string; amountPaise?: number; weight?: number; shares?: number }>
 }
 
 export interface SplitResult {
   userId: string
   amountPaise: number
   weight?: number
+  shares?: number
 }
 
 /**
@@ -21,6 +22,7 @@ export interface SplitResult {
  * - exact: participant-supplied amounts must sum exactly to amountPaise.
  * - percent: weights must sum to 100; each share is floor(amount*percent/100)
  *   and the remainder is distributed round-robin to the first participants.
+ * - shares: integer ratios (e.g. 2:1:1) of any total.
  */
 export function computeSplits(input: SplitInput): SplitResult[] {
   const { amountPaise, mode, participants } = input
@@ -30,6 +32,7 @@ export function computeSplits(input: SplitInput): SplitResult[] {
   if (participants.length === 0) throw new BadRequestError('At least one participant is required')
   if (mode === 'exact') return computeExact(amountPaise, participants)
   if (mode === 'percent') return computePercent(amountPaise, participants)
+  if (mode === 'shares') return computeShares(amountPaise, participants)
   return computeEqual(amountPaise, participants)
 }
 
@@ -56,6 +59,30 @@ function computeExact(amountPaise: number, participants: SplitInput['participant
   }
   if (sum !== amountPaise) {
     throw new BadRequestError(`Exact split amounts must sum to ${amountPaise} paise (got ${sum})`)
+  }
+  return results
+}
+
+function computeShares(amountPaise: number, participants: SplitInput['participants']): SplitResult[] {
+  let totalShares = 0
+  for (const p of participants) {
+    const s = p.shares
+    if (s === undefined || !Number.isInteger(s) || s < 1) {
+      throw new BadRequestError(`Participant ${p.userId} requires a positive integer share`)
+    }
+    totalShares += s
+  }
+  const results = participants.map((p) => ({
+    userId: p.userId,
+    shares: p.shares,
+    amountPaise: Math.floor((amountPaise * (p.shares as number)) / totalShares),
+  }))
+  let remainder = amountPaise - results.reduce((acc, r) => acc + r.amountPaise, 0)
+  let i = 0
+  while (remainder > 0) {
+    results[i].amountPaise += 1
+    remainder -= 1
+    i = (i + 1) % results.length
   }
   return results
 }
