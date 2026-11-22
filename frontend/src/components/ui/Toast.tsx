@@ -14,29 +14,48 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType | null>(null)
 
+const variants: Record<Toast['variant'], { icon: string; className: string }> = {
+  success: { icon: 'check_circle', className: 'tint-mint' },
+  error: { icon: 'error', className: 'tint-coral' },
+  warning: { icon: 'warning', className: 'tint-saffron' },
+  info: { icon: 'info', className: 'tint-lilac' },
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
-
-  const addToast = (message: string, variant: Toast['variant'] = 'info') => {
-    const id = Math.random().toString(36).slice(2)
-    setToasts(prev => [...prev, { id, message, variant }])
-    setTimeout(() => removeToast(id), 5000)
-  }
 
   const removeToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id))
   }
 
+  const addToast = (message: string, variant: Toast['variant'] = 'info') => {
+    const id = Math.random().toString(36).slice(2)
+    setToasts(prev => [...prev.slice(-2), { id, message, variant }])
+    setTimeout(() => removeToast(id), 4500)
+  }
+
   return (
     <ToastContext.Provider value={{ toasts, addToast, removeToast }}>
       {children}
-      <div className="fixed top-4 left-1/2 z-50 -translate-x-1/2 flex flex-col gap-sm">
+      <div className="pointer-events-none fixed bottom-24 left-md right-md z-[60] flex flex-col items-center gap-sm md:bottom-6 md:left-auto md:right-6 md:items-end">
         {toasts.map(toast => (
           <div
             key={toast.id}
-            className={`rounded-lg px-4 py-3 shadow-level-2 font-body-md text-body-md ${toast.variant === 'success' ? 'bg-green-100 text-green-800' : toast.variant === 'error' ? 'bg-error-container text-on-error-container' : toast.variant === 'warning' ? 'bg-amber-100 text-amber-800' : 'bg-primary-container text-on-primary-container'}`}
+            className={`animate-toast-in glass-card pointer-events-auto flex max-w-sm items-center gap-sm px-md py-sm shadow-level-2 ${variants[toast.variant].className}`}
+            role="status"
           >
-            {toast.message}
+            <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+              {variants[toast.variant].icon}
+            </span>
+            <span className="font-body-sm">{toast.message}</span>
+            <button
+              type="button"
+              onClick={() => removeToast(toast.id)}
+              aria-label="Dismiss"
+              className="ml-1 rounded-full p-0.5 opacity-60 transition-opacity hover:opacity-100"
+            >
+              <span className="material-symbols-outlined text-[16px]">close</span>
+            </button>
           </div>
         ))}
       </div>

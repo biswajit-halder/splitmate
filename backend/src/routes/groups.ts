@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { ForbiddenError, NotFoundError } from '../errors/AppError'
+import { ConflictError, ForbiddenError, NotFoundError } from '../errors/AppError'
 import { requireAuth } from '../middleware/auth'
 import type { AppEnv } from '../types'
 import { newId, nowIso } from '../utils/ids'
@@ -48,7 +48,7 @@ groupRoutes.get('/groups', async (c) => {
   const rows = await DB.prepare(
     `SELECT g.id, g.name, g.icon, g.icon_bg, g.icon_color, g.type, g.created_by,
             gm.status AS membership_status,
-            COALESCE(SUM(CASE WHEN b.user_id = ? THEN b.net_amount_paise ELSE 0 END), 0) AS net_paise
+            COALESCE(SUM(CASE WHEN b.user_id = ? THEN b.net_amount_paise ELSE -b.net_amount_paise END), 0) AS net_paise
      FROM groups g
      JOIN group_members gm ON gm.group_id = g.id
      LEFT JOIN balances b ON b.group_id = g.id AND (b.user_id = ? OR b.counterpart_id = ?)
@@ -205,7 +205,9 @@ groupRoutes.delete('/groups/:id', async (c) => {
   if (group.created_by !== userId) throw new ForbiddenError('Only the group owner can delete this group')
 
   await DB.batch([
-    DB.prepare('DELETE FROM spending_summary_monthly WHERE user_id IN (SELECT user_id FROM group_members WHERE group_id = ?)').bind(groupId),
+    DB.prepare(
+      "DELETE FROM notifications WHERE type = 'settlement' AND ref_id IN (SELECT id FROM settlements WHERE group_id = ?)"
+    ).bind(groupId),
     DB.prepare('DELETE FROM activity_events WHERE group_id = ?').bind(groupId),
     DB.prepare('DELETE FROM settlements WHERE group_id = ?').bind(groupId),
     DB.prepare('DELETE FROM balances WHERE group_id = ?').bind(groupId),
@@ -226,11 +228,16 @@ groupRoutes.post('/groups/:id/invite', async (c) => {
   const { DB } = c.env
 
   const existing = await DB.prepare(
-    'SELECT id FROM group_members WHERE group_id = ? AND email = ? AND user_id IS NULL'
+    'SELECT id, status, user_id FROM group_members WHERE group_id = ? AND email = ?'
   )
     .bind(groupId, email)
-    .first<{ id: string }>()
-  if (existing) throw new ForbiddenError('Invite already pending for this email')
+    .first<{ id: string; status: string; user_id: string | null }>()
+  if (existing) {
+    if (existing.user_id) {
+      throw new ConflictError('This person is already a member of the group')
+    }
+    throw new ForbiddenError('Invite already pending for this email')
+  }
 
   const id = newId()
   await DB.prepare(

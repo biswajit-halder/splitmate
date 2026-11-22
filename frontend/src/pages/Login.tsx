@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { authApi } from '../lib/api/auth'
 import { ApiError } from '../lib/api/client'
-import { useToast, PasswordInput, AuthDivider } from '../components/ui'
+import { useToast, PasswordInput, AuthDivider, BrandMark } from '../components/ui'
 
 function GoogleIcon() {
   return (
@@ -58,51 +58,41 @@ export function LoginPage() {
 
   return (
     <div className="flex w-full min-h-screen">
-      {/* Left: Illustration Panel */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-primary via-primary/90 to-primary/70">
-        <div
-          className="absolute inset-0 opacity-25 pointer-events-none"
-          style={{
-            backgroundImage: 'radial-gradient(rgba(255,255,255,0.45) 1px, transparent 1px)',
-            backgroundSize: '24px 24px',
-          }}
-        />
-        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute -bottom-32 -left-20 w-80 h-80 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-        <div className="absolute bottom-xxxl left-xl right-xl text-on-primary">
-          <h2 className="font-headline-lg text-headline-lg mb-sm text-white">Expense Tracking, Elevated.</h2>
-          <p className="font-body-lg text-body-lg text-white/80 max-w-md">
-            Effortlessly manage shared costs and settle up with precision. The seamless way to travel together.
-          </p>
+      {/* Left: brand panel */}
+      <div className="relative hidden w-1/2 overflow-hidden bg-gradient-to-br from-[#3A1830] via-primary/80 to-[#B69CFF] lg:flex">
+        <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+        <div className="absolute left-xl top-xl flex items-center gap-md text-on-primary">
+          <BrandMark size={34} />
+          <span className="font-headline-md">SplitMate</span>
         </div>
-        {/* Top brand mark */}
-        <div className="absolute top-xl left-xl flex items-center gap-md text-white">
-          <div className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/20">
-            <span className="material-symbols-outlined text-white">donut_small</span>
-          </div>
-          <span className="font-headline-md text-headline-md font-bold">SplitMate</span>
+        <div className="absolute bottom-xxxl left-xl right-xl text-on-primary">
+          <p className="eyebrow mb-md !text-on-primary/70">Shared expenses, simplified</p>
+          <h2 className="font-display-lg text-on-primary">Split the bill.<br />Keep the peace.</h2>
+          <p className="mt-lg max-w-md font-body-lg text-on-primary/80">
+            Track what you share, settle up in a tap, and keep every trip, home and night out
+            delightfully hassle-free.
+          </p>
         </div>
       </div>
 
       {/* Right: Form */}
-        <div className="w-full lg:w-1/2 flex flex-col items-center justify-center px-md py-xl sm:px-xl relative bg-background panel-pb">
-        <div className="w-full max-w-[440px] flex flex-col z-10">
+        <div className="relative flex w-full flex-col items-center justify-center bg-background px-md py-xl sm:px-xl panel-pb lg:w-1/2">
+        <div className="z-10 flex w-full max-w-[440px] flex-col">
           {/* Header */}
-          <div className="mb-xl text-center flex flex-col items-center">
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-white/20 text-white mb-md shadow-sm">
-              <span className="material-symbols-outlined" style={{ fontSize: 24 }}>donut_small</span>
+          <div className="mb-xl flex flex-col items-center text-center">
+            <div className="mb-md flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-[#B69CFF] shadow-[0_0_26px_rgba(255,107,94,0.35)]">
+              <BrandMark size={28} />
             </div>
-            <h1 className="font-headline-lg-mobile md:font-headline-lg text-on-background mb-xs tracking-tight">
-              SplitMate
-            </h1>
-            <p className="font-body-md text-body-md text-on-surface-variant">
-              Welcome back. Please enter your details.
+            <h1 className="font-headline-lg text-on-surface">Welcome back</h1>
+            <p className="mt-xs font-body-md text-body-md text-on-surface-variant">
+              Sign in to pick up where you left off.
             </p>
           </div>
 
           {/* Login Form Card */}
-          <div className="bg-surface rounded-xl border border-outline-variant/30 p-xl shadow-ambient">
+          <div className="surface-card p-xl">
             <form onSubmit={handleSubmit} className="flex flex-col gap-lg">
               {error && (
                 <div className="rounded-md bg-error-container p-md font-body-md text-body-md text-on-error-container">
@@ -126,7 +116,7 @@ export function LoginPage() {
                     placeholder="Enter your email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    className="w-full h-12 pl-11 pr-4 rounded-lg border border-outline/40 bg-transparent text-on-background placeholder:text-outline/60 font-body-md text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 outline-none"
+                    className="h-11 w-full rounded-lg border border-line bg-surface pl-11 pr-md font-body-md text-body-md text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/70 focus:border-primary focus:ring-2 focus:ring-primary/15"
                   />
                 </div>
                 {errors.email && <p className="font-label-sm text-label-sm text-error">{errors.email}</p>}
@@ -164,7 +154,7 @@ export function LoginPage() {
                 </label>
                 <Link
                   to="/forgot-password"
-className="font-label-md text-label-md text-primary hover:text-primary/80 transition-colors font-semibold"
+                  className="font-label-md text-primary transition-opacity hover:opacity-70"
                 >
                   Forgot password?
                 </Link>
@@ -175,7 +165,7 @@ className="font-label-md text-label-md text-primary hover:text-primary/80 transi
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full h-12 bg-primary text-on-primary font-label-md text-label-md font-semibold rounded-lg shadow-sm hover:opacity-90 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-sm disabled:opacity-70"
+                  className="pressable flex h-11 w-full items-center justify-center gap-sm rounded-xl bg-gradient-to-br from-primary to-[#FF8E63] font-label-md text-on-primary shadow-[0_8px_28px_rgba(255,107,94,0.35)] transition-all disabled:opacity-60"
                 >
                   {loading ? 'Signing in...' : 'Sign In'}
                 </button>

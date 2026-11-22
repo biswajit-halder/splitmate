@@ -50,10 +50,32 @@ describe('friends', () => {
 })
 
 describe('settlements', () => {
-  it('dual-confirm completes and moves balances', async () => {
+  it('dual-confirm clears the debt instead of increasing it', async () => {
     const payer = await authUser('Payer')
     const payee = await authUser('Payee')
     const groupId = await makeGroup(payer, [payee])
+
+    // The payee paid for a shared expense, so the payer owes them 1000.
+    const expense = await api(
+      `/api/groups/${groupId}/expenses`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          description: 'Dinner',
+          amountPaise: 2000,
+          paidBy: payee.id,
+          splitMode: 'equally',
+          participants: [{ userId: payer.id }, { userId: payee.id }],
+        }),
+      },
+      payee.cookie
+    )
+    expect(expense.status).toBe(201)
+
+    const before = await api(`/api/groups/${groupId}/balances`, {}, payer.cookie)
+    const beforeById = new Map(before.body.members.map((m: any) => [m.userId, m.netPaise]))
+    expect(beforeById.get(payee.id)).toBe(1000)
+    expect(beforeById.get(payer.id)).toBe(-1000)
 
     const create = await api(
       `/api/groups/${groupId}/settlements`,
@@ -71,8 +93,56 @@ describe('settlements', () => {
 
     const balances = await api(`/api/groups/${groupId}/balances`, {}, payer.cookie)
     const byId = new Map(balances.body.members.map((m: any) => [m.userId, m.netPaise]))
-    expect(byId.get(payee.id)).toBe(1000)
-    expect(byId.get(payer.id)).toBe(-1000)
+    expect(byId.get(payee.id)).toBe(0)
+    expect(byId.get(payer.id)).toBe(0)
+  })
+
+  it('partial settlement only clears part of the debt', async () => {
+    const payer = await authUser('Payer')
+    const payee = await authUser('Payee')
+    const groupId = await makeGroup(payer, [payee])
+
+    await api(
+      `/api/groups/${groupId}/expenses`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          description: 'Taxi',
+          amountPaise: 2000,
+          paidBy: payee.id,
+          splitMode: 'equally',
+          participants: [{ userId: payer.id }, { userId: payee.id }],
+        }),
+      },
+      payee.cookie
+    )
+
+    const create = await api(
+      `/api/groups/${groupId}/settlements`,
+      { method: 'POST', body: JSON.stringify({ payerId: payer.id, payeeId: payee.id, amountPaise: 500 }) },
+      payer.cookie
+    )
+    const settlementId = create.body.settlement.id
+    await api(`/api/settlements/${settlementId}/confirm`, { method: 'POST' }, payer.cookie)
+    await api(`/api/settlements/${settlementId}/confirm`, { method: 'POST' }, payee.cookie)
+
+    const balances = await api(`/api/groups/${groupId}/balances`, {}, payer.cookie)
+    const byId = new Map(balances.body.members.map((m: any) => [m.userId, m.netPaise]))
+    expect(byId.get(payee.id)).toBe(500)
+    expect(byId.get(payer.id)).toBe(-500)
+  })
+
+  it('settlement between non-members → 403', async () => {
+    const member = await authUser('Member')
+    const outsider = await authUser('Outsider')
+    const groupId = await makeGroup(member, [])
+
+    const res = await api(
+      `/api/groups/${groupId}/settlements`,
+      { method: 'POST', body: JSON.stringify({ payerId: member.id, payeeId: outsider.id, amountPaise: 100 }) },
+      member.cookie
+    )
+    expect(res.status).toBe(403)
   })
 
   it('third-party confirm → 403', async () => {
@@ -81,14 +151,72 @@ describe('settlements', () => {
     const stranger = await authUser('Stranger')
     const groupId = await makeGroup(payer, [payee])
 
+    // The payee paid for a shared expense, so the payer owes them 1000.
+    await api(
+      `/api/groups/${groupId}/expenses`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          description: 'Dinner',
+          amountPaise: 2000,
+          paidBy: payee.id,
+          splitMode: 'equally',
+          participants: [{ userId: payer.id }, { userId: payee.id }],
+        }),
+      },
+      payee.cookie
+    )
+
     const create = await api(
       `/api/groups/${groupId}/settlements`,
       { method: 'POST', body: JSON.stringify({ payerId: payer.id, payeeId: payee.id, amountPaise: 500 }) },
       payer.cookie
     )
+    expect(create.status).toBe(201)
     const settlementId = create.body.settlement.id
     const third = await api(`/api/settlements/${settlementId}/confirm`, { method: 'POST' }, stranger.cookie)
     expect(third.status).toBe(403)
+  })
+
+  it('settlement without an outstanding debt → 400', async () => {
+    const payer = await authUser('Payer')
+    const payee = await authUser('Payee')
+    const groupId = await makeGroup(payer, [payee])
+
+    const res = await api(
+      `/api/groups/${groupId}/settlements`,
+      { method: 'POST', body: JSON.stringify({ payerId: payer.id, payeeId: payee.id, amountPaise: 500 }) },
+      payer.cookie
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('settlement larger than the outstanding debt → 400', async () => {
+    const payer = await authUser('Payer')
+    const payee = await authUser('Payee')
+    const groupId = await makeGroup(payer, [payee])
+
+    await api(
+      `/api/groups/${groupId}/expenses`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          description: 'Dinner',
+          amountPaise: 1000,
+          paidBy: payee.id,
+          splitMode: 'equally',
+          participants: [{ userId: payer.id }, { userId: payee.id }],
+        }),
+      },
+      payee.cookie
+    )
+
+    const res = await api(
+      `/api/groups/${groupId}/settlements`,
+      { method: 'POST', body: JSON.stringify({ payerId: payer.id, payeeId: payee.id, amountPaise: 5000 }) },
+      payer.cookie
+    )
+    expect(res.status).toBe(400)
   })
 })
 

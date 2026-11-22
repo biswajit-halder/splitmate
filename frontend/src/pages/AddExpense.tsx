@@ -80,12 +80,12 @@ export function AddExpensePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!groupId || !description || !amount) {
-      addToast('Fill in group, description and amount', 'error' as never)
+      addToast('Fill in group, description and amount', 'error')
       return
     }
     const amountPaise = toPaise(amount)
     if (amountPaise <= 0) {
-      addToast('Enter a valid amount', 'error' as never)
+      addToast('Enter a valid amount', 'error')
       return
     }
 
@@ -96,12 +96,12 @@ export function AddExpensePage() {
       participants = members.map(m => ({ userId: m.userId, amountPaise: toPaise(exact[m.userId] ?? '0') }))
       const sum = participants.reduce((s, p) => s + (p.amountPaise ?? 0), 0)
       if (sum !== amountPaise) {
-        addToast('Exact splits must sum to the total', 'error' as never)
+        addToast('Exact splits must sum to the total', 'error')
         return
       }
     } else {
       if (!percentSumValid) {
-        addToast('Percentages must total 100%', 'error' as never)
+        addToast('Percentages must total 100%', 'error')
         return
       }
       participants = members.map(m => ({
@@ -128,20 +128,23 @@ export function AddExpensePage() {
       }
       navigate(`/groups/${groupId}`)
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to save expense', 'error' as never)
+      addToast(err instanceof Error ? err.message : 'Failed to save expense', 'error')
     }
   }
 
   return (
-    <div className="flex flex-col gap-xl max-w-content">
+    <div className="flex flex-col gap-xl">
       <div>
-        <h2 className="font-headline-lg md:font-headline-xl text-headline-lg md:text-headline-xl text-on-surface">{isEditMode ? 'Edit Expense' : 'Add Expense'}</h2>
-        <p className="font-body-md text-body-md text-on-surface-variant mt-xs">{isEditMode ? 'Update expense details.' : 'Record a shared expense.'}</p>
+        <p className="eyebrow mb-2">{isEditMode ? 'Update record' : 'New record'}</p>
+        <h1 className="font-headline-lg text-headline-lg text-on-surface">{isEditMode ? 'Edit Expense' : 'Add Expense'}</h1>
+        <p className="mt-xs font-body-md text-body-md text-on-surface-variant">
+          {isEditMode ? 'Update the details of this shared expense.' : 'Record a shared expense and split it your way.'}
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-surface rounded-xl border border-line/40 p-lg flex flex-col gap-lg">
+      <form onSubmit={handleSubmit} className="surface-card flex flex-col gap-xl p-xl">
         <div className="flex flex-col gap-xs">
-          <label className="font-label-sm text-label-sm text-on-surface-variant">Group</label>
+          <label className="eyebrow">Group</label>
           <Select
             value={groupId}
             onChange={setGroupId}
@@ -151,32 +154,32 @@ export function AddExpensePage() {
         </div>
 
         <div className="flex flex-col gap-xs">
-          <label className="font-label-sm text-label-sm text-on-surface-variant">Description</label>
+          <label className="eyebrow">Description</label>
           <input
             value={description}
             onChange={e => setDescription(e.target.value)}
             placeholder="e.g. Dinner at restaurant"
-            className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-colors"
+            className="h-11 w-full rounded-lg border border-line bg-surface px-md font-body-md outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
           />
         </div>
 
         <div className="flex flex-col gap-xs">
-          <label className="font-label-sm text-label-sm text-on-surface-variant">Amount</label>
-          <div className="flex items-center gap-md px-md rounded-lg border border-line/40 bg-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-colors">
-            <span className="text-outline">₹</span>
+          <label className="eyebrow">Amount</label>
+          <div className="flex h-11 items-center gap-md rounded-lg border border-line bg-surface px-md transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+            <span className="text-on-surface-variant">₹</span>
             <input
               value={amount}
               onChange={e => setAmount(e.target.value)}
               inputMode="decimal"
               placeholder="0.00"
-              className="w-full h-12 bg-transparent text-on-surface font-body-md text-body-md outline-none"
+              className="num h-full w-full bg-transparent font-body-md text-body-md text-on-surface outline-none"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-md">
           <div className="flex flex-col gap-xs">
-            <label className="font-label-sm text-label-sm text-on-surface-variant">Category</label>
+            <label className="eyebrow">Category</label>
             <Select
               value={category}
               onChange={setCategory}
@@ -184,7 +187,7 @@ export function AddExpensePage() {
             />
           </div>
           <div className="flex flex-col gap-xs">
-            <label className="font-label-sm text-label-sm text-on-surface-variant">Paid by</label>
+            <label className="eyebrow">Paid by</label>
             <Select
               value={paidBy}
               onChange={setPaidBy}
@@ -197,11 +200,22 @@ export function AddExpensePage() {
         </div>
 
         <div className="flex flex-col gap-xs">
-          <label className="font-label-sm text-label-sm text-on-surface-variant">Split</label>
-          <div className="flex gap-md">
-            <button type="button" onClick={() => setSplitMode('equally')} className={`px-md py-md rounded-lg border ${splitMode === 'equally' ? 'border-primary text-primary' : 'border-line/40 text-on-surface-variant'}`}>Equally</button>
-            <button type="button" onClick={() => setSplitMode('exact')} className={`px-md py-md rounded-lg border ${splitMode === 'exact' ? 'border-primary text-primary' : 'border-line/40 text-on-surface-variant'}`}>Exact</button>
-            <button type="button" onClick={() => setSplitMode('percent')} className={`px-md py-md rounded-lg border ${splitMode === 'percent' ? 'border-primary text-primary' : 'border-line/40 text-on-surface-variant'}`}>Percent</button>
+          <label className="eyebrow">Split method</label>
+          <div className="flex gap-sm rounded-xl bg-surface-container-low p-1">
+            {(['equally', 'exact', 'percent'] as const).map(mode => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setSplitMode(mode)}
+                className={`flex-1 rounded-lg px-md py-2 font-label-md capitalize transition-colors ${
+                  splitMode === mode
+                    ? 'bg-surface text-primary shadow-sm'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -210,8 +224,8 @@ export function AddExpensePage() {
             {members.map(m => (
               <div key={m.userId} className="flex items-center gap-md">
                 <span className="flex-1 font-label-md text-label-md text-on-surface">{m.name}</span>
-                <div className="flex items-center gap-xs px-md rounded-lg border border-line/40 bg-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-colors">
-                  <span className="text-outline">₹</span>
+                <div className="flex h-10 items-center gap-xs rounded-lg border border-line bg-surface px-md transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+                  <span className="text-on-surface-variant">₹</span>
                   <input
                     value={exact[m.userId] ?? ''}
                     onChange={e => setExact(prev => ({ ...prev, [m.userId]: e.target.value }))}
@@ -232,8 +246,8 @@ export function AddExpensePage() {
               return (
                 <div key={m.userId} className="flex items-center gap-md">
                   <span className="flex-1 font-label-md text-label-md text-on-surface">{m.name}</span>
-                  <span className="text-body-sm text-on-surface-variant w-20 text-right">₹{calculatedAmount}</span>
-                  <div className="flex items-center gap-xs px-md rounded-lg border border-line/40 bg-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-colors">
+                  <span className="num w-20 text-right font-body-sm text-body-sm text-on-surface-variant">₹{calculatedAmount}</span>
+                  <div className="flex h-10 items-center gap-xs rounded-lg border border-line bg-surface px-md transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
                     <input
                       value={percentages[m.userId] ?? ''}
                       onChange={e => setPercentages(prev => ({ ...prev, [m.userId]: e.target.value }))}
@@ -241,7 +255,7 @@ export function AddExpensePage() {
                       placeholder="0"
                       className="w-16 h-10 bg-transparent text-on-surface outline-none text-right"
                     />
-                    <span className="text-outline">%</span>
+                    <span className="text-on-surface-variant">%</span>
                   </div>
                 </div>
               )

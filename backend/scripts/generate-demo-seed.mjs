@@ -1,6 +1,10 @@
-// Generates backend/migrations/0003_seed_demo_users.sql
+// Generates backend/seed/demo_seed.sql
 // Run with: node backend/scripts/generate-demo-seed.mjs
 // All 50 demo users share password "demo1234".
+//
+// This file is intentionally NOT a D1 migration: demo accounts must never be
+// applied to a production database. Apply it to a local database with:
+//   npx wrangler d1 execute splitmate-db --local --file=./seed/demo_seed.sql
 
 import { writeFileSync } from 'node:fs'
 import { webcrypto } from 'node:crypto'
@@ -8,7 +12,7 @@ import { webcrypto } from 'node:crypto'
 const { subtle } = webcrypto
 
 const DEMO_PASSWORD = 'demo1234'
-const OUT = new URL('../migrations/0003_seed_demo_users.sql', import.meta.url)
+const OUT = new URL('../seed/demo_seed.sql', import.meta.url)
 
 function toB64url(bytes) {
   return Buffer.from(bytes).toString('base64url')
@@ -110,7 +114,7 @@ const pendingFriends = [
 // ---- Build SQL ----
 const stmts = []
 const balancesMap = new Map() // key gid|user|counterpart -> amount
-const spendingMap = new Map() // key user|month -> amount
+const spendingMap = new Map() // unused: spending is derived from expenses
 
 function addBalance(gid, creditor, debtor, amount) {
   const key = `${gid}|${creditor}|${debtor}`
@@ -171,9 +175,7 @@ for (const g of groups) {
       )
       if (memId !== paidBy) addBalance(g.id, paidBy, memId, shares[i])
     })
-    // spending summary for payer
-    const sKey = `${paidBy}|${MONTH}`
-    spendingMap.set(sKey, (spendingMap.get(sKey) || 0) + e.amount)
+    // spending is derived from the expenses table at read time
     // activity
     stmts.push(
       `INSERT OR IGNORE INTO activity_events (id, user_id, type, group_id, payload, created_at) VALUES (${sq(`act-${expId}`)}, ${sq(paidBy)}, 'expense_added', ${sq(g.id)}, ${sq(JSON.stringify({ expenseId: expId, amountPaise: e.amount, groupName: g.name, description: e.desc }))}, ${sq(TS)});`
@@ -189,13 +191,8 @@ for (const [key, amount] of balancesMap) {
   )
 }
 
-// Spending summary
-for (const [key, amount] of spendingMap) {
-  const [user, month] = key.split('|')
-  stmts.push(
-    `INSERT OR IGNORE INTO spending_summary_monthly (id, user_id, month, total_paise, settled_paise, updated_at) VALUES (${sq(`ss-${user}-${month}`)}, ${sq(user)}, ${sq(month)}, ${amount}, 0, ${sq(TS)});`
-  )
-}
+// Note: the spending summary is derived from the expenses table at read time,
+// so there is no denormalised summary table to seed.
 
 // Friend requests (accepted)
 let frId = 1
@@ -230,8 +227,11 @@ stmts.push(
 
 const header = `-- SplitMate demo seed: 50 users + groups/expenses/friends/settlements.
 -- All demo users share password "${DEMO_PASSWORD}".
--- Idempotent (deterministic ids + INSERT OR IGNORE). Apply via:
---   npx wrangler d1 migrations apply splitmate-db --local
+-- Idempotent (deterministic ids + INSERT OR IGNORE).
+--
+-- DEVELOPMENT ONLY - this is not a migration, so it is never applied to the
+-- production database. Apply it to a local database with:
+--   npx wrangler d1 execute splitmate-db --local --file=./seed/demo_seed.sql
 
 `
 

@@ -32,7 +32,7 @@ import { usersApi } from '../lib/api/users'
 import { groupsApi } from '../lib/api/groups'
 import { friendsApi } from '../lib/api/friends'
 import { useAuth } from '../context/AuthContext'
-import { useToast, Button, BlobAvatar, PasswordInput } from '../components/ui'
+import { useToast, Button, BlobAvatar, PasswordInput, AccentSwitcher } from '../components/ui'
 import { getAvatarPair } from '../lib/avatarColors'
 
 type AvatarBgOption = { label: string; className: string; preview: string }
@@ -82,17 +82,17 @@ export function ProfilePage() {
       setSession({ ...user!, ...res })
       addToast('Profile updated', 'success')
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to update', 'error' as never)
+      addToast(err instanceof Error ? err.message : 'Failed to update', 'error')
     }
   }
 
   const handleSaveEmail = async () => {
     if (!email.trim()) {
-      addToast('Email cannot be empty', 'error' as never)
+      addToast('Email cannot be empty', 'error')
       return
     }
     if (!emailConfirmPassword) {
-      addToast('Enter your password to change email', 'error' as never)
+      addToast('Enter your password to change email', 'error')
       return
     }
     try {
@@ -102,13 +102,13 @@ export function ProfilePage() {
       setEmailConfirmPassword('')
       addToast('Email updated', 'success')
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to change email', 'error' as never)
+      addToast(err instanceof Error ? err.message : 'Failed to change email', 'error')
     }
   }
 
   const handleSavePassword = async () => {
     if (!currentPassword || !newPassword) {
-      addToast('Both password fields are required', 'error' as never)
+      addToast('Both password fields are required', 'error')
       return
     }
     try {
@@ -117,7 +117,7 @@ export function ProfilePage() {
       setNewPassword('')
       addToast('Password updated', 'success')
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to change password', 'error' as never)
+      addToast(err instanceof Error ? err.message : 'Failed to change password', 'error')
     }
   }
 
@@ -128,7 +128,7 @@ export function ProfilePage() {
 
   return (
     <div className="flex flex-col gap-xl max-w-content">
-      <h2 className="font-headline-lg md:font-headline-xl text-headline-lg md:text-headline-xl text-on-surface">Profile & Settings</h2>
+      <h1 className="font-headline-lg text-headline-lg text-on-surface">Profile & Settings</h1>
 
       {/* Section 1: Profile Header */}
       <div className="bg-surface rounded-xl border border-line/40 p-xl flex flex-col items-center text-center">
@@ -233,15 +233,19 @@ export function ProfilePage() {
       </div>
 
       {/* Section 4: Preferences */}
-      <div className="bg-surface rounded-xl border border-line/40 p-lg flex flex-col gap-md">
-        <h3 className="font-headline-sm text-headline-sm text-on-surface">Preferences</h3>
-        <div className="flex items-center justify-between p-md rounded-lg bg-surface-container-low">
-          <span className="font-label-md text-label-md text-on-surface">Currency</span>
-          <span className="font-label-md text-label-md text-on-surface-variant">INR (₹)</span>
+      <div className="glass-card flex flex-col gap-lg p-lg">
+        <h3 className="font-headline-sm text-on-surface">Preferences</h3>
+        <div className="flex flex-col gap-sm">
+          <p className="micro-label">Accent signal</p>
+          <AccentSwitcher />
         </div>
-        <div className="flex items-center justify-between p-md rounded-lg bg-surface-container-low">
-          <span className="font-label-md text-label-md text-on-surface">Theme</span>
-          <span className="font-label-md text-label-md text-on-surface-variant">System</span>
+        <div className="flex items-center justify-between rounded-xl bg-surface-container-low p-md">
+          <span className="font-label-md text-on-surface">Currency</span>
+          <span className="num font-label-md text-on-surface-variant">INR (₹)</span>
+        </div>
+        <div className="flex items-center justify-between rounded-xl bg-surface-container-low p-md">
+          <span className="font-label-md text-on-surface">Theme</span>
+          <span className="font-label-md text-on-surface-variant">Night Market / Daylight</span>
         </div>
       </div>
 

@@ -11,7 +11,13 @@ export default defineConfig({
       return {
         wrangler: { configPath: './wrangler.jsonc' },
         miniflare: {
-          bindings: { TEST_MIGRATIONS: migrations, RATE_LIMIT_DISABLED: 'true' },
+          bindings: {
+            TEST_MIGRATIONS: migrations,
+            RATE_LIMIT_DISABLED: 'true',
+            // JWT_SECRET is a production secret (never in wrangler.jsonc vars),
+            // so the test pool provides its own throwaway value.
+            JWT_SECRET: 'test-only-jwt-secret-that-is-long-enough-0123456789',
+          },
         },
       }
     }),

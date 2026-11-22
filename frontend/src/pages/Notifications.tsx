@@ -2,17 +2,9 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApi, useMutation } from '../hooks/useApi'
 import { notificationsApi } from '../lib/api/notifications'
+import { relativeTime } from '../lib/dates'
 import { Skeleton, Button, Badge } from '../components/ui'
 import { useToast } from '../components/ui'
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
-}
 
 export function NotificationsPage() {
   const navigate = useNavigate()
@@ -59,11 +51,11 @@ export function NotificationsPage() {
   const list = data?.notifications ?? []
 
   return (
-    <div className="flex flex-col gap-xl max-w-content">
+    <div className="flex flex-col gap-xl">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-headline-lg md:font-headline-xl text-headline-lg md:text-headline-xl text-on-surface">Notifications</h2>
-          <p className="font-body-md text-body-md text-on-surface-variant mt-xs">
+          <h1 className="font-headline-lg text-headline-lg text-on-surface">Notifications</h1>
+          <p className="mt-xs font-body-md text-body-md text-on-surface-variant">
             {data?.unread ?? 0} unread
           </p>
         </div>
@@ -77,9 +69,9 @@ export function NotificationsPage() {
           <button
             key={n.id}
             onClick={() => handleNotificationClick(n)}
-            className={`flex items-start gap-md p-md rounded-lg bg-surface border border-line/40 text-left cursor-pointer hover:bg-surface-container-low/50 transition-colors ${n.isRead ? '' : 'border-primary/40'}`}
+            className={`surface-card flex cursor-pointer items-start gap-md p-lg text-left transition-colors hover:bg-surface-container-low ${n.isRead ? '' : 'border-primary/30'}`}
           >
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-container text-on-primary-container">
               <span className="material-symbols-outlined text-primary text-[18px]">notifications</span>
             </div>
             <div className="flex-1 min-w-0">
@@ -88,7 +80,7 @@ export function NotificationsPage() {
                 {!n.isRead && <Badge variant="primary">new</Badge>}
               </div>
               {n.body && <p className="font-body-sm text-body-sm text-on-surface-variant">{n.body}</p>}
-              <p className="font-body-sm text-body-sm text-on-surface-variant mt-xs">{timeAgo(n.createdAt)}</p>
+              <p className="mt-xs font-body-sm text-body-sm text-on-surface-variant">{relativeTime(n.createdAt)}</p>
             </div>
             {!n.isRead && (
               <Button variant="ghost" onClick={(e) => { e.stopPropagation(); handleOne(n.id) }}>Mark read</Button>

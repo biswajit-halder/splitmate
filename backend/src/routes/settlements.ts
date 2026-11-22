@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { ForbiddenError, NotFoundError } from '../errors/AppError'
+import { BadRequestError, ForbiddenError, NotFoundError } from '../errors/AppError'
+import { computeNet, type BalanceRow } from '../lib/balances'
+import { assertActiveMembers } from '../lib/membership'
 import { requireAuth } from '../middleware/auth'
 import type { AppEnv } from '../types'
 import { newId, nowIso } from '../utils/ids'
@@ -113,6 +115,41 @@ settlementRoutes.get('/groups/:id/settlements', async (c) => {
   return c.json({ settlements: rows.results })
 })
 
+/**
+ * Amount the payer still owes the payee in this group (0 when the payer owes
+ * nothing). Pending settlements are already accounted for so the same debt
+ * cannot be scheduled twice.
+ */
+async function getOutstandingPaise(
+  db: D1Database,
+  groupId: string,
+  payerId: string,
+  payeeId: string
+): Promise<number> {
+  const rows = await db
+    .prepare(
+      `SELECT user_id, counterpart_id, net_amount_paise FROM balances
+       WHERE group_id = ? AND ((user_id = ? AND counterpart_id = ?) OR (user_id = ? AND counterpart_id = ?))`
+    )
+    .bind(groupId, payerId, payeeId, payeeId, payerId)
+    .all<BalanceRow>()
+
+  // computeNet returns the payer's net position with the payee: negative
+  // means the payer owes the payee.
+  const net = computeNet(rows.results).get(payerId) ?? 0
+  const outstanding = Math.max(0, -net)
+
+  const pending = await db
+    .prepare(
+      `SELECT COALESCE(SUM(amount_paise), 0) AS total FROM settlements
+       WHERE group_id = ? AND status = 'pending' AND payer_id = ? AND payee_id = ?`
+    )
+    .bind(groupId, payerId, payeeId)
+    .first<{ total: number }>()
+
+  return Math.max(0, outstanding - (pending?.total ?? 0))
+}
+
 settlementRoutes.post('/groups/:id/settlements', async (c) => {
   const groupId = c.req.param('id')
   await assertMember(c, groupId)
@@ -120,6 +157,19 @@ settlementRoutes.post('/groups/:id/settlements', async (c) => {
   const { DB } = c.env
 
   if (body.payerId === body.payeeId) throw new ForbiddenError('Payer and payee must differ')
+  await assertActiveMembers(c.env.DB, groupId, [body.payerId, body.payeeId], 'settlement parties')
+
+  // A settlement must clear an actual debt in the right direction; otherwise
+  // it would create a new one.
+  const outstanding = await getOutstandingPaise(c.env.DB, groupId, body.payerId, body.payeeId)
+  if (outstanding <= 0) {
+    throw new BadRequestError('There is no outstanding debt between these members to settle')
+  }
+  if (body.amountPaise > outstanding) {
+    throw new BadRequestError(
+      `Settlement exceeds the outstanding balance of ${outstanding} paise`
+    )
+  }
 
   const id = newId()
   await DB.prepare(
@@ -175,14 +225,18 @@ settlementRoutes.post('/settlements/:id/confirm', async (c) => {
   ]
 
   if (completed) {
-    // payer settles debt with payee: balance(payee -> payer) increases by amount
+    // The payer (debtor) hands money to the payee (creditor), so the payer's
+    // debt shrinks: credit the payer / debit the payee. A row
+    // (user_id = payer, counterpart_id = payee, net = +amount) means
+    // "the payee's claim against the payer is reduced by amount" once it is
+    // netted with the original (payee -> payer) expense row.
     statements.push(
       DB.prepare(
         `INSERT INTO balances (id, group_id, user_id, counterpart_id, net_amount_paise, updated_at)
          VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(group_id, user_id, counterpart_id)
          DO UPDATE SET net_amount_paise = net_amount_paise + excluded.net_amount_paise, updated_at = excluded.updated_at`
-      ).bind(newId(), settlement.group_id, settlement.payee_id, settlement.payer_id, settlement.amount_paise, now)
+      ).bind(newId(), settlement.group_id, settlement.payer_id, settlement.payee_id, settlement.amount_paise, now)
     )
     statements.push(
       DB.prepare(

@@ -17,16 +17,11 @@ interface SelectProps {
 export function Select({ value, onChange, options, placeholder = 'Select an option', className, disabled }: SelectProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-
   const selectedOption = options.find(o => o.value === value)
 
-  // Guard: null ref early return
   const handleClickOutside = useCallback((e: MouseEvent) => {
-    if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-      setOpen(false)
-    }
+    if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
   }, [])
-
   const handleEscape = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') setOpen(false)
   }, [])
@@ -40,41 +35,42 @@ export function Select({ value, onChange, options, placeholder = 'Select an opti
     }
   }, [handleClickOutside, handleEscape])
 
-  const handleSelect = (optionValue: string) => {
-    onChange(optionValue)
-    setOpen(false)
-  }
-
   return (
     <div ref={containerRef} className={`relative ${className ?? ''}`}>
       <button
         type="button"
         disabled={disabled}
         onClick={() => setOpen(prev => !prev)}
-        className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface font-body-md text-body-md text-on-surface flex items-center justify-between cursor-pointer transition-colors hover:border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+        aria-expanded={open}
+        className="flex h-11 w-full items-center justify-between rounded-xl border border-line bg-surface-container-low/80 px-md text-left font-body-md text-on-surface backdrop-blur transition-colors hover:border-outline focus:border-primary disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <span className={!selectedOption ? 'text-on-surface-variant' : ''}>
+        <span className={`truncate ${!selectedOption ? 'text-on-surface-variant' : ''}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <span className="material-symbols-outlined text-[20px] text-on-surface-variant">
+        <span className={`material-symbols-outlined shrink-0 text-[20px] text-on-surface-variant transition-transform ${open ? 'rotate-180' : ''}`}>
           expand_more
         </span>
       </button>
 
       {open && options.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full rounded-lg border border-line/40 bg-surface shadow-lg max-h-60 overflow-auto">
+        <div className="animate-scale-in glass-card absolute z-50 mt-1.5 max-h-60 w-full origin-top overflow-auto p-1 shadow-level-2">
           {options.map(option => (
-            <div
+            <button
               key={option.value}
-              onClick={() => handleSelect(option.value)}
-              className={`px-md py-3 font-body-md text-body-md cursor-pointer transition-colors ${
+              type="button"
+              onClick={() => {
+                onChange(option.value)
+                setOpen(false)
+              }}
+              className={`flex w-full items-center justify-between rounded-lg px-md py-2.5 text-left font-body-md transition-colors ${
                 option.value === value
-                  ? 'bg-surface-container text-primary font-semibold'
-                  : 'text-on-surface hover:bg-surface-container-low'
+                  ? 'bg-primary/15 font-semibold text-primary'
+                  : 'text-on-surface hover:bg-surface-container'
               }`}
             >
-              {option.label}
-            </div>
+              <span className="truncate">{option.label}</span>
+              {option.value === value && <span className="material-symbols-outlined text-[18px]">check</span>}
+            </button>
           ))}
         </div>
       )}

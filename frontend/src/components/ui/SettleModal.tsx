@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { settlementsApi } from '../../lib/api/settlements'
 import { balancesApi } from '../../lib/api/balances'
 import { toPaise, formatMoney } from '../../lib/money'
@@ -37,37 +37,42 @@ export function SettleModal({ open, onClose, groupId, groupName, members, onSett
     [groupId],
   )
 
-  const eligibleMembers = members.filter(m => m.userId !== user?.id)
+  // Pairwise position: negative means "I owe them", positive means "they owe me".
+  const myBalanceMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const b of balances.data?.myBalances ?? []) map.set(b.userId, b.netPaise)
+    return map
+  }, [balances.data])
 
-  const memberBalanceMap = new Map<string, number>()
-  if (balances.data?.members) {
-    for (const member of balances.data.members) {
-      memberBalanceMap.set(member.userId, member.netPaise)
-    }
-  }
+  // Only members with an actual pairwise debt can be settled with.
+  const eligibleMembers = useMemo(
+    () => members.filter(m => m.userId !== user?.id && myBalanceMap.get(m.userId)),
+    [members, user?.id, myBalanceMap]
+  )
 
-  const selectedBalance = toUserId ? (memberBalanceMap.get(toUserId) ?? 0) : 0
+  const selectedBalance = toUserId ? (myBalanceMap.get(toUserId) ?? 0) : 0
+  const iOweThem = selectedBalance < 0
+  const theyOweMe = selectedBalance > 0
 
-  // Fix 1: Preselection — first useEffect sets toUserId when modal opens and members are available
+  // Preselect the requested member once balances have loaded.
   useEffect(() => {
-    if (open && preselectedUserId && eligibleMembers.some(m => m.userId === preselectedUserId)) {
+    if (!open) return
+    if (preselectedUserId && eligibleMembers.some(m => m.userId === preselectedUserId)) {
       setToUserId(preselectedUserId)
     }
   }, [open, preselectedUserId, eligibleMembers])
 
-  // Fix 1b: If toUserId is set but doesn't match any eligible member (stale after members load), re-apply preselection
   useEffect(() => {
-    if (open && toUserId && preselectedUserId && !eligibleMembers.some(m => m.userId === toUserId)) {
-      if (eligibleMembers.some(m => m.userId === preselectedUserId)) {
-        setToUserId(preselectedUserId)
-      }
+    if (!open || !toUserId) return
+    if (!eligibleMembers.some(m => m.userId === toUserId)) {
+      setToUserId(eligibleMembers.length === 1 ? eligibleMembers[0].userId : '')
     }
-  }, [open, toUserId, preselectedUserId, eligibleMembers])
+  }, [open, toUserId, eligibleMembers])
 
-  // Fix 2: Pre-fill amount with outstanding balance when member changes (unless user manually edited)
+  // Pre-fill the amount with the outstanding balance unless the user edited it.
   useEffect(() => {
     if (!open || !toUserId || userEditedAmount.current) return
-    setAmount(Math.abs(selectedBalance / 100).toFixed(2))
+    setAmount((Math.abs(selectedBalance) / 100).toFixed(2))
   }, [open, toUserId, selectedBalance])
 
   const reset = () => {
@@ -79,13 +84,25 @@ export function SettleModal({ open, onClose, groupId, groupName, members, onSett
   }
 
   const handleSubmit = async () => {
-    if (!toUserId || !amount || !groupId) return
+    if (!toUserId || !amount || !groupId || !user) return
+    const amountPaise = toPaise(amount)
+    const outstanding = Math.abs(selectedBalance)
+    if (amountPaise <= 0) {
+      addToast('Enter a valid amount', 'error')
+      return
+    }
+    if (amountPaise > outstanding) {
+      addToast(`Amount cannot be more than ${formatMoney(outstanding)}`, 'error')
+      return
+    }
     setSubmitting(true)
     try {
+      // The payer is whoever owes the money, so a settlement always clears a
+      // debt instead of creating one.
       await settlementsApi.create(groupId, {
-        payerId: user?.id ?? '',
-        payeeId: toUserId,
-        amountPaise: toPaise(amount),
+        payerId: iOweThem ? user.id : toUserId,
+        payeeId: iOweThem ? toUserId : user.id,
+        amountPaise,
         method,
         note: note || undefined,
       })
@@ -105,26 +122,37 @@ export function SettleModal({ open, onClose, groupId, groupName, members, onSett
     onClose()
   }
 
+  const directionLabel = iOweThem ? 'Pay To' : theyOweMe ? 'Collect From' : 'Member'
+  const actionLabel = iOweThem ? 'Record Payment' : theyOweMe ? 'Record Payment Received' : 'Record Settlement'
+
   return (
-    <Modal isOpen={open} onClose={handleClose} title={`Settle Up \u2014 ${groupName}`}>
+    <Modal isOpen={open} onClose={handleClose} title={`Settle Up — ${groupName}`}>
       <div className="flex flex-col gap-lg">
         <div className="flex flex-col gap-xs">
-          <label className="font-label-sm text-label-sm text-on-surface-variant">Pay To</label>
+          <label className="font-label-sm text-label-sm text-on-surface-variant">{directionLabel}</label>
           <Select
             value={toUserId}
-            onChange={setToUserId}
-            placeholder="Select a member"
+            onChange={(value) => {
+              userEditedAmount.current = false
+              setToUserId(value)
+            }}
+            placeholder={balances.loading ? 'Loading members…' : 'Select a member'}
             options={eligibleMembers.map(m => ({ value: m.userId, label: m.name }))}
           />
           {toUserId && !balances.loading && (
             <span className={`font-body-sm text-body-sm ${
-              selectedBalance > 0 ? 'text-success' :
-              selectedBalance < 0 ? 'text-error' :
+              iOweThem ? 'text-error' :
+              theyOweMe ? 'text-success' :
               'text-on-surface-variant'
             }`}>
-              {selectedBalance > 0 && `They owe you ${formatMoney(selectedBalance)}`}
-              {selectedBalance < 0 && `You owe them ${formatMoney(Math.abs(selectedBalance))}`}
+              {iOweThem && `You owe them ${formatMoney(Math.abs(selectedBalance))}`}
+              {theyOweMe && `They owe you ${formatMoney(selectedBalance)}`}
               {selectedBalance === 0 && 'No outstanding balance'}
+            </span>
+          )}
+          {!balances.loading && eligibleMembers.length === 0 && (
+            <span className="font-body-sm text-body-sm text-on-surface-variant">
+              Nobody in this group owes you money right now.
             </span>
           )}
         </div>
@@ -168,7 +196,7 @@ export function SettleModal({ open, onClose, groupId, groupName, members, onSett
         <div className="flex justify-end gap-md">
           <Button variant="secondary" onClick={handleClose}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={submitting || !toUserId || !amount}>
-            {submitting ? 'Recording...' : 'Record Settlement'}
+            {submitting ? 'Recording...' : actionLabel}
           </Button>
         </div>
       </div>

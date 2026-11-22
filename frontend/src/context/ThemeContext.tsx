@@ -19,9 +19,9 @@ export function useTheme() {
 }
 
 function getInitialTheme(): Theme {
+  // Night Market (dark) is the default; light is an explicit opt-in.
   const stored = localStorage.getItem('splitmate-theme') as Theme | null
-  if (stored === 'light' || stored === 'dark') return stored
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  return stored === 'light' ? 'light' : 'dark'
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -29,25 +29,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const root = document.documentElement
-    if (theme === 'dark') {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
-    }
+    root.classList.toggle('dark', theme === 'dark')
+    root.classList.toggle('light', theme === 'light')
     localStorage.setItem('splitmate-theme', theme)
   }, [theme])
-
-  // Listen for system preference changes
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const handler = (e: MediaQueryListEvent) => {
-      if (!localStorage.getItem('splitmate-theme')) {
-        setThemeState(e.matches ? 'dark' : 'light')
-      }
-    }
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [])
 
   const toggleTheme = () => setThemeState(t => t === 'light' ? 'dark' : 'light')
   const setTheme = (t: Theme) => setThemeState(t)

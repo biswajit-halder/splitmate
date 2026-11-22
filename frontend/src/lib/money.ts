@@ -1,11 +1,27 @@
+const inr = new Intl.NumberFormat('en-IN', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
+/** ₹1,234.50 — negative amounts put the minus before the symbol. */
 export function formatMoney(paise: number): string {
-  const rupees = paise / 100
-  return `₹${rupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const sign = paise < 0 ? '-' : ''
+  return `${sign}₹${inr.format(Math.abs(paise) / 100)}`
 }
 
+/** +₹1,234.50 / -₹1,234.50 — for balances that need an explicit direction. */
 export function formatSigned(paise: number): string {
-  const sign = paise < 0 ? '-' : paise > 0 ? '+' : ''
-  return `${sign}${formatMoney(Math.abs(paise))}`
+  const sign = paise > 0 ? '+' : paise < 0 ? '-' : ''
+  return `${sign}₹${inr.format(Math.abs(paise) / 100)}`
+}
+
+/** Compact form for dense views: ₹1.2k / ₹12.4k. */
+export function formatMoneyCompact(paise: number): string {
+  const rupees = Math.abs(paise) / 100
+  const sign = paise < 0 ? '-' : ''
+  if (rupees >= 100000) return `${sign}₹${(rupees / 100000).toFixed(1)}L`
+  if (rupees >= 1000) return `${sign}₹${(rupees / 1000).toFixed(1)}k`
+  return formatMoney(paise)
 }
 
 /** Convert integer paise back to a rupee string for form inputs. */

@@ -1,4 +1,13 @@
-JWT_SECRET=dev-only-secret-change-me
+# Local development secrets. Copy this file to `.dev.vars` (gitignored) and
+# replace the placeholder with a random value:
+#
+#   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+#
+# JWT_SECRET must never be committed. In production set it with:
+#
+#   npx wrangler secret put JWT_SECRET
+#
+JWT_SECRET=replace-with-a-random-64-character-secret
 APP_ORIGIN=http://localhost:5173
 # Cookie security. In dev (HTTP) keep COOKIE_SECURE=false and COOKIE_SAMESITE=Lax.
 # For production cross-site cookie auth use COOKIE_SECURE=true and COOKIE_SAMESITE=None.

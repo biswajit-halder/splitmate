@@ -38,9 +38,14 @@ friendRoutes.get('/friends', async (c) => {
 
   const balances = await DB.prepare(
     `SELECT counterpart_id, SUM(net_amount_paise) AS total
-     FROM balances WHERE user_id = ? GROUP BY counterpart_id`
+     FROM (
+       SELECT counterpart_id, net_amount_paise FROM balances WHERE user_id = ?
+       UNION ALL
+       SELECT user_id AS counterpart_id, -net_amount_paise FROM balances WHERE counterpart_id = ?
+     )
+     GROUP BY counterpart_id`
   )
-    .bind(userId)
+    .bind(userId, userId)
     .all<{ counterpart_id: string; total: number }>()
 
   const balanceMap = new Map(balances.results.map((b) => [b.counterpart_id, b.total ?? 0]))
@@ -105,17 +110,29 @@ friendRoutes.post('/friends/requests', async (c) => {
   )
     .bind(userId, target.id, target.id, userId)
     .first<{ id: string; status: string }>()
+
+  let id: string
   if (existing) {
     if (existing.status === 'accepted') throw new BadRequestError('Already friends')
-    throw new BadRequestError('A friend request already exists between you and this user')
+    if (existing.status === 'pending') {
+      throw new BadRequestError('A friend request already exists between you and this user')
+    }
+    // The previous request was rejected: re-open it instead of failing on the
+    // UNIQUE(requester_id, addressee_id) constraint.
+    id = existing.id
+    await DB.prepare(
+      "UPDATE friend_requests SET requester_id = ?, addressee_id = ?, status = 'pending', updated_at = ? WHERE id = ?"
+    )
+      .bind(userId, target.id, nowIso(), id)
+      .run()
+  } else {
+    id = newId()
+    await DB.prepare(
+      'INSERT INTO friend_requests (id, requester_id, addressee_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+    )
+      .bind(id, userId, target.id, 'pending', nowIso(), nowIso())
+      .run()
   }
-
-  const id = newId()
-  await DB.prepare(
-    'INSERT INTO friend_requests (id, requester_id, addressee_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
-  )
-    .bind(id, userId, target.id, 'pending', nowIso(), nowIso())
-    .run()
 
   await DB.prepare(
     'INSERT INTO notifications (id, user_id, title, body, type, ref_id, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -123,11 +140,11 @@ friendRoutes.post('/friends/requests', async (c) => {
     .bind(newId(), target.id, 'New friend request', 'Someone wants to connect', 'friend_request', id, 0, nowIso())
     .run()
 
-  const me = await DB.prepare('SELECT name FROM users WHERE id = ?').bind(userId).first<{ name: string }>()
+  const targetName = await DB.prepare('SELECT name FROM users WHERE id = ?').bind(target.id).first<{ name: string }>()
   await DB.prepare(
     'INSERT INTO activity_events (id, user_id, type, payload, created_at) VALUES (?, ?, ?, ?, ?)'
   )
-    .bind(newId(), userId, 'friend_request', JSON.stringify({ toUserId: target.id, toName: me?.name ?? '' }), nowIso())
+    .bind(newId(), userId, 'friend_request', JSON.stringify({ toUserId: target.id, toName: targetName?.name ?? '' }), nowIso())
     .run()
 
   return c.json({ request: { id } }, 201)

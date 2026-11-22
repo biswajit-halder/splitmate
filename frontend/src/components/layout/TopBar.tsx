@@ -1,83 +1,130 @@
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi'
 import { notificationsApi } from '../../lib/api/notifications'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
+import { BrandMark, BlobAvatar } from '../ui'
+import { SearchDialog } from './SearchDialog'
+
+function IconButton({ label, onClick, children, badge }: {
+  label: string
+  onClick: () => void
+  children: React.ReactNode
+  badge?: number
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="relative flex h-9 w-9 items-center justify-center rounded-full border border-line/70 bg-surface-container-low/70 text-on-surface-variant backdrop-blur transition-colors hover:border-primary/50 hover:text-primary"
+    >
+      {children}
+      {badge !== undefined && badge > 0 && (
+        <span className="num absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-on-primary">
+          {badge > 9 ? '9+' : badge}
+        </span>
+      )}
+    </button>
+  )
+}
 
 export function TopBar() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { data } = useApi(() => notificationsApi.list())
+  const [searchOpen, setSearchOpen] = useState(false)
   const unread = data?.unread ?? 0
-  const initials = (user?.name ?? '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
 
   return (
-    <header className="fixed top-0 w-full lg:w-main z-50 glass-panel shadow-sm">
-      <div className="flex justify-between items-center h-16 px-md md:px-xxl w-full">
-        {/* Mobile logo */}
-        <div className="lg:hidden flex items-center gap-sm">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="material-symbols-outlined text-on-primary text-[20px]">donut_small</span>
-          </div>
-          <span className="font-headline-md text-headline-md font-bold text-primary">SplitMate</span>
-        </div>
-
-        {/* Spacer for desktop */}
-        <div className="hidden lg:block" />
-
-        <div className="flex items-center gap-md ml-auto">
-          {/* Search icon */}
+    <>
+      <header className="glass-panel fixed left-0 right-0 top-0 z-50 lg:left-[248px]">
+        <div className="mx-auto flex h-16 w-full max-w-content items-center gap-md px-md md:px-xxl">
           <button
-            onClick={() => {/* TODO: open search modal */}}
-            title="Search everywhere"
-            aria-label="Search everywhere"
-            className="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-colors"
+            onClick={() => navigate('/dashboard')}
+            className="flex shrink-0 items-center gap-sm lg:hidden"
+            aria-label="SplitMate home"
           >
-            <span className="material-symbols-outlined">search</span>
-          </button>
-
-          {/* Theme Toggle */}
-          <button
-            onClick={toggleTheme}
-            className="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-colors"
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            <span className="material-symbols-outlined">
-              {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-[var(--accent-2)] glow-shadow">
+              <BrandMark size={20} className="text-[#241016]" />
             </span>
+            <span className="font-headline-md text-on-surface">SplitMate</span>
           </button>
 
-          {/* Notifications */}
+          <div className="hidden shrink-0 lg:block">
+            <p className="font-body-sm text-on-surface-variant">workspace / <span className="text-on-surface">overview</span></p>
+          </div>
+
+          {/* Command bar — opens the search dialog */}
           <button
-            onClick={() => navigate('/notifications')}
-            className="relative p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-colors"
+            onClick={() => setSearchOpen(true)}
+            className="ml-auto hidden h-9 max-w-md flex-1 items-center gap-sm rounded-xl border border-line bg-surface-container-low/70 px-md text-left font-body-sm text-on-surface-variant backdrop-blur transition-colors hover:border-primary/50 md:flex"
           >
-            <span className="material-symbols-outlined">notifications</span>
-            {unread > 0 && (
-              <span className="absolute top-1.5 right-1.5 min-w-4 h-4 px-1 rounded-full bg-error text-white text-[10px] flex items-center justify-center">
-                {unread > 9 ? '9+' : unread}
+            <span className="material-symbols-outlined text-[18px] accent-text">search</span>
+            <span className="truncate">Search groups, friends, anything…</span>
+            <kbd className="ml-auto rounded border border-line px-1.5 py-0.5 font-label-sm text-on-surface-variant">⌘ K</kbd>
+          </button>
+          <div className="ml-auto md:hidden">
+            <IconButton label="Search" onClick={() => setSearchOpen(true)}>
+              <span className="material-symbols-outlined text-[20px]">search</span>
+            </IconButton>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <button
+              onClick={() => navigate('/activity')}
+              className="hidden items-center gap-2 rounded-full border border-line bg-surface-container-low/70 px-md py-1.5 font-label-sm text-on-surface-variant backdrop-blur transition-colors hover:border-primary/50 xl:flex"
+              title="Live activity"
+            >
+              <span className="accent-dot" />
+              LIVE
+            </button>
+            <IconButton
+              label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              onClick={toggleTheme}
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                {theme === 'dark' ? 'light_mode' : 'dark_mode'}
               </span>
-            )}
-          </button>
+            </IconButton>
+            <IconButton label="Notifications" onClick={() => navigate('/notifications')} badge={unread}>
+              <span className="material-symbols-outlined text-[20px]">notifications</span>
+            </IconButton>
 
-          {/* Add Expense button */}
-          <button
-            onClick={() => navigate('/expenses/add')}
-            className="hidden md:flex items-center gap-sm py-2 px-lg rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 transition-opacity"
-          >
-            <span className="material-symbols-outlined text-[18px]">add</span>
-            Add Expense
-          </button>
+            <button
+              onClick={() => navigate('/expenses/add')}
+              className="ml-1 hidden h-9 items-center gap-1.5 rounded-xl bg-gradient-to-br from-primary to-[var(--accent-2)] px-md font-label-md text-on-primary glow-shadow transition-all hover:brightness-110 md:flex"
+            >
+              <span className="material-symbols-outlined text-[18px]">add</span>
+              Add expense
+            </button>
 
-          {/* Profile */}
-          <Link to="/profile">
-            <div className={`w-10 h-10 rounded-full overflow-hidden border border-outline-variant/30 cursor-pointer ${user?.avatarBg ?? 'bg-primary'} flex items-center justify-center text-on-primary font-bold text-label-md`}>
-              {initials}
-            </div>
-          </Link>
+            <Link to="/profile" className="ml-1 shrink-0 rounded-full transition-transform hover:scale-105" aria-label="Profile">
+              {user ? (
+                <BlobAvatar userId={user.id} name={user.name} size={36} rounded="square" />
+              ) : (
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-container font-label-md text-on-primary-container">
+                  ?
+                </span>
+              )}
+            </Link>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
+    </>
   )
 }

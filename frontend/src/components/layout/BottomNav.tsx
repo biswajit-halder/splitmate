@@ -5,33 +5,35 @@ const navItems = [
   { path: '/groups', label: 'Groups', icon: 'group' },
   { path: '/friends', label: 'Friends', icon: 'person' },
   { path: '/activity', label: 'Activity', icon: 'history' },
-  { path: '/expenses/add', label: 'Pay', icon: 'account_balance_wallet' },
+  { path: '/expenses/add', label: 'Add', icon: 'add_circle' },
 ]
 
 export function BottomNav() {
   return (
-    <nav className="lg:hidden fixed bottom-0 w-full z-50 rounded-t-xl border-t border-line/40 bg-surface shadow-[0_-4px_12px_rgba(0,0,0,0.05)] flex justify-around items-center h-16 px-md">
+    <nav className="glass-panel fixed bottom-0 left-0 right-0 z-50 flex h-[68px] items-center justify-around border-t border-line px-sm pb-[env(safe-area-inset-bottom)] shadow-[0_-12px_40px_rgba(0,0,0,0.4)] lg:hidden">
       {navItems.map(item => (
         <NavLink
           key={item.path}
           to={item.path}
           className={({ isActive }) =>
-            `flex flex-col items-center justify-center transition-colors rounded-xl px-2 py-1 ${
-              isActive
-                ? 'text-primary font-bold bg-primary/5 scale-90'
-                : 'text-on-surface-variant hover:bg-surface-container'
+            `flex min-w-[56px] flex-col items-center gap-1 rounded-xl px-2 py-1.5 transition-colors ${
+              isActive ? 'text-primary' : 'text-on-surface-variant'
             }`
           }
         >
           {({ isActive }) => (
             <>
               <span
-                className="material-symbols-outlined"
-                style={{ fontVariationSettings: `'FILL' ${isActive ? 1 : 0}` }}
+                className={`flex h-7 w-11 items-center justify-center rounded-full transition-all ${isActive ? 'bg-primary/20 shadow-[0_0_20px_rgba(255,107,94,0.25)]' : ''}`}
               >
-                {item.icon}
+                <span
+                  className="material-symbols-outlined text-[21px]"
+                  style={{ fontVariationSettings: `'FILL' ${isActive ? 1 : 0}` }}
+                >
+                  {item.icon}
+                </span>
               </span>
-              <span className="font-label-sm text-label-sm">{item.label}</span>
+              <span className="font-label-sm">{item.label}</span>
             </>
           )}
         </NavLink>
@@ -39,4 +41,3 @@ export function BottomNav() {
     </nav>
   )
 }
-

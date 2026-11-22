@@ -1,7 +1,10 @@
--- SplitMate demo seed: 50 users + groups/expenses/friends/settlements.
+﻿-- SplitMate demo seed: 50 users + groups/expenses/friends/settlements.
 -- All demo users share password "demo1234".
--- Idempotent (deterministic ids + INSERT OR IGNORE). Apply via:
---   npx wrangler d1 migrations apply splitmate-db --local
+-- Idempotent (deterministic ids + INSERT OR IGNORE).
+--
+-- DEVELOPMENT ONLY - this is not a migration, so it is never applied to the
+-- production database. Apply it to a local database with:
+--   npx wrangler d1 execute splitmate-db --local --file=./seed/demo_seed.sql
 
 
 -- 50 demo users. All share password "demo1234".
@@ -420,16 +423,6 @@ INSERT OR IGNORE INTO balances (id, group_id, user_id, counterpart_id, net_amoun
 INSERT OR IGNORE INTO balances (id, group_id, user_id, counterpart_id, net_amount_paise, updated_at) VALUES ('bal-demo-group-4-demo-044-demo-046', 'demo-group-4', 'demo-044', 'demo-046', 430, '2026-08-05T12:00:00.000Z');
 INSERT OR IGNORE INTO balances (id, group_id, user_id, counterpart_id, net_amount_paise, updated_at) VALUES ('bal-demo-group-4-demo-044-demo-047', 'demo-group-4', 'demo-044', 'demo-047', 430, '2026-08-05T12:00:00.000Z');
 INSERT OR IGNORE INTO balances (id, group_id, user_id, counterpart_id, net_amount_paise, updated_at) VALUES ('bal-demo-group-4-demo-044-demo-048', 'demo-group-4', 'demo-044', 'demo-048', 430, '2026-08-05T12:00:00.000Z');
-INSERT OR IGNORE INTO spending_summary_monthly (id, user_id, month, total_paise, settled_paise, updated_at) VALUES ('ss-demo-001-2026-08', 'demo-001', '2026-08', 75000, 0, '2026-08-05T12:00:00.000Z');
-INSERT OR IGNORE INTO spending_summary_monthly (id, user_id, month, total_paise, settled_paise, updated_at) VALUES ('ss-demo-004-2026-08', 'demo-004', '2026-08', 3200, 0, '2026-08-05T12:00:00.000Z');
-INSERT OR IGNORE INTO spending_summary_monthly (id, user_id, month, total_paise, settled_paise, updated_at) VALUES ('ss-demo-008-2026-08', 'demo-008', '2026-08', 6800, 0, '2026-08-05T12:00:00.000Z');
-INSERT OR IGNORE INTO spending_summary_monthly (id, user_id, month, total_paise, settled_paise, updated_at) VALUES ('ss-demo-003-2026-08', 'demo-003', '2026-08', 9200, 0, '2026-08-05T12:00:00.000Z');
-INSERT OR IGNORE INTO spending_summary_monthly (id, user_id, month, total_paise, settled_paise, updated_at) VALUES ('ss-demo-013-2026-08', 'demo-013', '2026-08', 5400, 0, '2026-08-05T12:00:00.000Z');
-INSERT OR IGNORE INTO spending_summary_monthly (id, user_id, month, total_paise, settled_paise, updated_at) VALUES ('ss-demo-020-2026-08', 'demo-020', '2026-08', 1800, 0, '2026-08-05T12:00:00.000Z');
-INSERT OR IGNORE INTO spending_summary_monthly (id, user_id, month, total_paise, settled_paise, updated_at) VALUES ('ss-demo-025-2026-08', 'demo-025', '2026-08', 1200, 0, '2026-08-05T12:00:00.000Z');
-INSERT OR IGNORE INTO spending_summary_monthly (id, user_id, month, total_paise, settled_paise, updated_at) VALUES ('ss-demo-032-2026-08', 'demo-032', '2026-08', 900, 0, '2026-08-05T12:00:00.000Z');
-INSERT OR IGNORE INTO spending_summary_monthly (id, user_id, month, total_paise, settled_paise, updated_at) VALUES ('ss-demo-037-2026-08', 'demo-037', '2026-08', 3000, 0, '2026-08-05T12:00:00.000Z');
-INSERT OR IGNORE INTO spending_summary_monthly (id, user_id, month, total_paise, settled_paise, updated_at) VALUES ('ss-demo-044-2026-08', 'demo-044', '2026-08', 5600, 0, '2026-08-05T12:00:00.000Z');
 INSERT OR IGNORE INTO friend_requests (id, requester_id, addressee_id, status, created_at, updated_at) VALUES ('fr-1', 'demo-001', 'demo-002', 'accepted', '2026-08-05T12:00:00.000Z', '2026-08-05T12:00:00.000Z');
 INSERT OR IGNORE INTO friend_requests (id, requester_id, addressee_id, status, created_at, updated_at) VALUES ('fr-2', 'demo-001', 'demo-003', 'accepted', '2026-08-05T12:00:00.000Z', '2026-08-05T12:00:00.000Z');
 INSERT OR IGNORE INTO friend_requests (id, requester_id, addressee_id, status, created_at, updated_at) VALUES ('fr-3', 'demo-001', 'demo-004', 'accepted', '2026-08-05T12:00:00.000Z', '2026-08-05T12:00:00.000Z');

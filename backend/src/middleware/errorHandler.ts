@@ -13,6 +13,10 @@ export async function errorHandler(err: unknown, c: Context<AppEnv>) {
     }
     return c.json({ error: 'Validation failed', details }, 400)
   }
+  if (err instanceof SyntaxError) {
+    // Malformed JSON request body (c.req.json()).
+    return c.json({ error: 'Invalid JSON body', code: 'INVALID_JSON' }, 400)
+  }
   if (err instanceof AppError) {
     return c.json({ error: err.message, code: err.code }, err.status as ContentfulStatusCode)
   }

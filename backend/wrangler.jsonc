@@ -15,8 +15,13 @@
     }
   ],
   "vars": {
-    "JWT_SECRET": "dev-only-secret-change-me",
-    "APP_ORIGIN": "https://splitmate.mytrading.workers.dev",
-    "COOKIE_SECURE": "true"
+    // Non-secret configuration only. Never put a secret here: `vars` are
+    // committed to source control and uploaded as plain-text bindings.
+    "APP_ORIGIN": "https://splitmate.bhalder.workers.dev",
+    "COOKIE_SECURE": "true",
+    // The SPA and the API live on different workers.dev subdomains, which are
+    // cross-site. A SameSite=Lax cookie is NOT sent on cross-site fetches,
+    // so production needs SameSite=None (which requires Secure).
+    "COOKIE_SAMESITE": "None"
   }
 }

@@ -1,71 +1,93 @@
 import { NavLink, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
+import { AccentSwitcher, BrandMark } from '../ui'
 
-const navItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
+const primaryNav = [
+  { path: '/dashboard', label: 'Dashboard', icon: 'space_dashboard' },
   { path: '/groups', label: 'Groups', icon: 'group' },
   { path: '/friends', label: 'Friends', icon: 'person' },
+]
+
+const secondaryNav = [
   { path: '/activity', label: 'Activity', icon: 'history' },
   { path: '/analytics', label: 'Analytics', icon: 'bar_chart' },
   { path: '/settlements', label: 'Settlements', icon: 'payments' },
 ]
 
+function NavItem({ item }: { item: { path: string; label: string; icon: string } }) {
+  return (
+    <NavLink
+      to={item.path}
+      className={({ isActive }) =>
+        `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 font-label-md transition-all ${
+          isActive
+            ? 'bg-primary/15 text-on-primary-container shadow-[inset_0_0_0_1px_rgba(255,107,94,0.25),0_0_20px_rgba(255,107,94,0.08)]'
+            : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+        }`
+      }
+    >
+      {({ isActive }) => (
+        <>
+          {isActive && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-primary shadow-[0_0_12px_var(--color-primary)]" />}
+          <span
+            className="material-symbols-outlined text-[20px]"
+            style={{ fontVariationSettings: `'FILL' 1` }}
+          >
+            {item.icon}
+          </span>
+          <span>{item.label}</span>
+        </>
+      )}
+    </NavLink>
+  )
+}
+
 export function Sidebar() {
   const navigate = useNavigate()
+  const { logout } = useAuth()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
-    <aside className="fixed left-0 top-0 h-full w-sidebar border-r border-outline-variant/30 bg-surface shadow-sm hidden lg:flex flex-col py-xl z-40">
-      {/* Logo */}
-      <div className="px-xl mb-xl">
-        <div className="flex items-center gap-md">
-          <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-            <span className="material-symbols-outlined text-on-primary">donut_small</span>
-          </div>
-          <div>
-            <h1 className="font-headline-md text-headline-md font-bold text-primary">SplitMate</h1>
-            <p className="font-label-sm text-label-sm text-on-surface-variant">Expense Management</p>
-          </div>
+    <aside className="glass-panel fixed left-0 top-0 z-40 hidden h-full w-sidebar flex-col border-r border-line bg-surface/70 lg:flex">
+      <div className="flex items-center gap-3 px-xl pb-lg pt-xl">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-[#B69CFF] shadow-[0_0_24px_rgba(255,107,94,0.35)]">
+          <BrandMark size={26} className="text-[#241016]" />
+        </div>
+        <div>
+          <p className="font-headline-md leading-none text-on-surface">SplitMate</p>
+          <p className="mt-1.5 font-label-sm text-on-surface-variant">Shared expenses, simplified</p>
         </div>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1">
-        <ul className="flex flex-col">
-          {navItems.map(item => (
-            <li key={item.path}>
-              <NavLink
-                to={item.path}
-                className={({ isActive }) =>
-                  `flex items-center gap-md px-lg py-md transition-all duration-200 ${
-                    isActive
-                      ? 'bg-primary/5 text-primary font-bold border-l-4 border-primary translate-x-1'
-                      : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <span
-                      className="material-symbols-outlined"
-                      style={{ fontVariationSettings: `'FILL' ${isActive ? 1 : 0}` }}
-                    >
-                      {item.icon}
-                    </span>
-                    <span className="font-label-md text-label-md">{item.label}</span>
-                  </>
-                )}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
+      <nav className="flex-1 space-y-lg overflow-y-auto px-md py-lg">
+        <div>
+          <p className="eyebrow mb-sm px-3">Workspace</p>
+          <div className="flex flex-col gap-1">
+            {primaryNav.map(item => <NavItem key={item.path} item={item} />)}
+          </div>
+        </div>
+        <div>
+          <p className="eyebrow mb-sm px-3">Insights</p>
+          <div className="flex flex-col gap-1">
+            {secondaryNav.map(item => <NavItem key={item.path} item={item} />)}
+          </div>
+        </div>
       </nav>
 
-      {/* Logout at bottom */}
-      <div className="px-md mt-auto border-t border-outline-variant/20 pt-md">
+      <div className="border-t border-line px-md py-lg">
+        <div className="mb-lg">
+          <AccentSwitcher />
+        </div>
         <button
-          onClick={() => navigate('/login', { replace: true })}
-          className="flex items-center gap-md px-lg py-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-lg transition-colors w-full text-left"
+          onClick={handleLogout}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 font-label-md text-on-surface-variant transition-colors hover:bg-error-container hover:text-on-error-container"
         >
-          <span className="material-symbols-outlined">logout</span>
-          <span className="font-label-md text-label-md">Logout</span>
+          <span className="material-symbols-outlined text-[20px]">logout</span>
+          <span>Logout</span>
         </button>
       </div>
     </aside>

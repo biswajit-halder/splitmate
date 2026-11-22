@@ -5,8 +5,9 @@ import { groupsApi } from '../lib/api/groups'
 import { settlementsApi } from '../lib/api/settlements'
 import { expensesApi } from '../lib/api/expenses'
 import { balancesApi } from '../lib/api/balances'
-import { formatMoney, toPaise } from '../lib/money'
-import { Modal, Button, Skeleton, Badge, EmptyState, BlobAvatar, CategoryIcon, Select } from '../components/ui'
+import { formatMoney } from '../lib/money'
+import { formatDateCompact, formatDateTime } from '../lib/dates'
+import { Modal, Button, Skeleton, Badge, EmptyState, BlobAvatar, SettleModal } from '../components/ui'
 import { useToast } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 
@@ -36,44 +37,25 @@ export function GroupDetailPage() {
   const [settleOpen, setSettleOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
-  const [memberId, setMemberId] = useState('')
-  const [amount, setAmount] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmAction, setConfirmAction] = useState<(() => Promise<void>) | null>(null)
   const [confirmMessage, setConfirmMessage] = useState('')
 
-  const createSettlement = useMutation((body: { payerId: string; payeeId: string; amountPaise: number }) =>
-    settlementsApi.create(id, body),
-  )
   const invite = useMutation((email: string) => groupsApi.invite(id, email))
   const deleteExpense = useMutation((expId: string) => expensesApi.remove(expId))
-  const leaveGroupMutation = useMutation(() => groupsApi.leave(id))
-  const removeMemberMutation = useMutation((userId: string) => groupsApi.removeMember(id, userId))
+  const leaveGroup = useMutation(() => groupsApi.leave(id))
+  const removeMember = useMutation((userId: string) => groupsApi.removeMember(id, userId))
 
   const members = useMemo(
-    () =>
-      (balances.data?.members ?? group.data?.members ?? []).map(m => ({
+    () => (balances.data?.members ?? group.data?.members ?? [])
+      .map(m => ({
         userId: 'userId' in m ? m.userId : (m as { id: string }).id,
         name: m.name,
-        avatarBg: 'avatarBg' in m ? m.avatarBg : (m as { bgColor: string | null }).bgColor,
         netPaise: 'netPaise' in m ? m.netPaise : 0,
-      })),
+      }))
+      .sort((a, b) => b.netPaise - a.netPaise || a.name.localeCompare(b.name)),
     [balances.data, group.data],
   )
-
-  const handleSettle = async () => {
-    if (!memberId || !amount) return
-    try {
-      await createSettlement.mutate({ payerId: user?.id ?? '', payeeId: memberId, amountPaise: toPaise(amount) })
-      addToast('Settlement recorded', 'success')
-      setSettleOpen(false)
-      setMemberId('')
-      setAmount('')
-      settlements.refetch()
-    } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to settle', 'error' as never)
-    }
-  }
 
   const handleInvite = async () => {
     if (!inviteEmail.trim()) return
@@ -83,17 +65,18 @@ export function GroupDetailPage() {
       setInviteEmail('')
       setInviteOpen(false)
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to invite', 'error' as never)
+      addToast(err instanceof Error ? err.message : 'Failed to invite', 'error')
     }
   }
 
-  const handleDeleteExpense = async (expId: string) => {
+  const handleDelete = async (expenseId: string) => {
     try {
-      await deleteExpense.mutate(expId)
-      addToast('Expense deleted', 'success')
+      await deleteExpense.mutate(expenseId)
+      addToast('Expense removed', 'success')
       expenses.refetch()
+      balances.refetch()
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to delete', 'error' as never)
+      addToast(err instanceof Error ? err.message : 'Failed to remove', 'error')
     }
   }
 
@@ -102,242 +85,195 @@ export function GroupDetailPage() {
     try {
       await confirmAction()
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Action failed', 'error' as never)
+      addToast(err instanceof Error ? err.message : 'Action failed', 'error')
     } finally {
       setConfirmOpen(false)
       setConfirmAction(null)
     }
   }
 
-  const handleLeaveGroup = () => {
-    setConfirmMessage('Are you sure you want to leave this group?')
-    setConfirmAction(async () => {
-      await leaveGroupMutation.mutate()
-      addToast('You have left the group', 'success')
-      navigate('/groups')
-    })
+  const ask = (message: string, action: () => Promise<void>) => {
+    setConfirmMessage(message)
+    setConfirmAction(() => action)
     setConfirmOpen(true)
   }
 
-  const handleRemoveMember = (memberName: string, memberUserId: string) => {
-    setConfirmMessage(`Remove ${memberName} from this group?`)
-    setConfirmAction(async () => {
-      await removeMemberMutation.mutate(memberUserId)
-      addToast(`${memberName} removed`, 'success')
-      group.refetch()
-      balances.refetch()
-    })
-    setConfirmOpen(true)
-  }
-
-  if (group.loading) {
-    return (
-      <div className="flex flex-col gap-lg max-w-content">
-        <Skeleton height={48} />
-        <Skeleton height={200} />
-      </div>
-    )
-  }
-
-  if (!group.data) {
-    return <div className="max-w-content"><p className="font-body-md text-body-md text-on-surface-variant">Group not found.</p></div>
-  }
+  if (group.loading) return <div className="flex flex-col gap-lg"><Skeleton height={60} /><Skeleton height={260} /></div>
+  if (!group.data) return <p className="font-body-md text-on-surface-variant">Group not found.</p>
 
   const g = group.data
+  const isOwner = g.createdBy === user?.id
 
   return (
-    <div className="flex flex-col gap-xl max-w-content">
-      <div className="bg-surface rounded-xl border border-line/40 p-lg">
-        <div className="flex items-center justify-between flex-wrap gap-md">
-          <div className="flex items-center gap-md">
-            <CategoryIcon category={g.type ?? 'home'} size={48} />
-            <div>
-              <h2 className="font-headline-lg text-headline-lg text-on-surface">{g.name}</h2>
-              <p className="font-label-sm text-label-sm text-on-surface-variant">{g.type} · {g.members.length} members</p>
-            </div>
+    <div className="flex flex-col">
+      {/* Statement header — no stat cards */}
+      <div className="flex flex-col gap-lg sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="flex items-center gap-sm">
+            <span className="tint-saffron rounded-full px-2.5 py-1 font-label-sm capitalize">{g.type ?? 'group'}</span>
+            <span className="font-body-sm text-on-surface-variant">{g.members.length} people</span>
           </div>
-          <div className="flex gap-sm">
-            <Button variant="secondary" onClick={() => setInviteOpen(true)} className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px] leading-none">person_add</span> Invite
-            </Button>
-            <Button variant="secondary" onClick={() => navigate(`/expenses/add?group=${g.id}`)} className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px] leading-none">add</span> Add Expense
-            </Button>
-            <Button onClick={() => setSettleOpen(true)} className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px] leading-none">payments</span> Settle Up
-            </Button>
-          </div>
+          <h1 className="mt-sm font-headline-lg text-on-surface">{g.name}</h1>
+          <p className="mt-xs font-body-sm text-on-surface-variant">Created by {g.createdByName}</p>
         </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-md mt-lg">
-          <div className="bg-surface-container-low rounded-lg p-md">
-            <p className="font-label-sm text-label-sm text-on-surface-variant">Group Net</p>
-            <p className="font-headline-sm text-headline-sm text-on-surface">{formatMoney(balances.data?.sumPaise ?? 0)}</p>
-          </div>
-          <div className="bg-surface-container-low rounded-lg p-md">
-            <p className="font-label-sm text-label-sm text-on-surface-variant">Expenses</p>
-            <p className="font-headline-sm text-headline-sm text-on-surface">{expenses.data?.length ?? 0}</p>
-          </div>
-          <div className="bg-surface-container-low rounded-lg p-md">
-            <p className="font-label-sm text-label-sm text-on-surface-variant">Settlements</p>
-            <p className="font-headline-sm text-headline-sm text-on-surface">{settlements.data?.length ?? 0}</p>
-          </div>
+        <div className="flex flex-wrap gap-sm">
+          <Button variant="secondary" onClick={() => setInviteOpen(true)}>
+            <span className="material-symbols-outlined text-[18px]">person_add</span> Invite
+          </Button>
+          <Button variant="secondary" onClick={() => navigate(`/expenses/add?group=${g.id}`)}>
+            <span className="material-symbols-outlined text-[18px]">add</span> Expense
+          </Button>
+          <Button onClick={() => setSettleOpen(true)}>
+            <span className="material-symbols-outlined text-[18px]">payments</span> Settle up
+          </Button>
         </div>
       </div>
 
-      {/* Members */}
-      <div className="bg-surface rounded-xl border border-line/40 p-lg">
-        <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Members</h3>
-        <div className="flex flex-col gap-sm">
-          {members.map(m => (
-            <div key={m.userId} className="flex items-center justify-between p-md rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors">
-              <div className="flex items-center gap-md">
-                <BlobAvatar userId={m.userId} name={m.name} size={36} />
-                <span className="font-label-md text-label-md text-on-surface">{m.name}{m.userId === user?.id ? ' (You)' : ''}</span>
-              </div>
-              <div className="flex items-center gap-md">
-                <span className={`font-label-md text-label-md ${m.netPaise > 0 ? 'text-success' : m.netPaise < 0 ? 'text-error' : 'text-on-surface-variant'}`}>
-                  {formatMoney(m.netPaise)}
-                </span>
-                {g.createdBy === user?.id && m.userId !== user?.id && (
+      <div className="mt-xxl grid grid-cols-1 gap-xl lg:grid-cols-[1.55fr_1fr]">
+        {/* Ledger */}
+        <div>
+          <div className="flex items-baseline justify-between">
+            <h2 className="font-headline-sm text-on-surface">Ledger</h2>
+            <button onClick={() => navigate(`/expenses/add?group=${g.id}`)} className="font-label-md text-primary hover:opacity-70 transition-opacity">+ Add entry</button>
+          </div>
+          <div className="mt-lg flex flex-col">
+            {(expenses.data ?? []).map(exp => (
+              <div key={exp.id} className="group flex items-center gap-md border-b border-line/70 py-md transition-colors hover:bg-surface-container/40">
+                <div className="tint-lilac flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
+                  <span className="material-symbols-outlined text-[19px]">{CATEGORY_ICONS[exp.category ?? ''] ?? 'category'}</span>
+                </div>
+                <button className="min-w-0 flex-1 text-left" onClick={() => navigate(`/expenses/${exp.id}`)}>
+                  <p className="truncate font-label-md text-on-surface">{exp.description}</p>
+                  <p className="truncate font-body-sm text-on-surface-variant">
+                    {exp.paidByName}{exp.paidBy === user?.id ? ' (you)' : ''} · {formatDateCompact(exp.expenseDate)} · {exp.splitMode}
+                  </p>
+                </button>
+                <span className="num font-label-md text-on-surface">{formatMoney(exp.amountPaise)}</span>
+                {exp.canEdit && (
                   <button
-                    onClick={() => handleRemoveMember(m.name, m.userId)}
-                    className="text-on-surface-variant hover:text-error p-xs transition-colors"
-                    aria-label={`Remove ${m.name}`}
+                    onClick={() => handleDelete(exp.id)}
+                    aria-label={`Delete ${exp.description}`}
+                    className="rounded-full p-1.5 text-on-surface-variant opacity-0 transition-all hover:bg-primary/15 hover:text-primary group-hover:opacity-100"
                   >
-                    <span className="material-symbols-outlined text-[18px]">close</span>
+                    <span className="material-symbols-outlined text-[18px]">delete</span>
                   </button>
                 )}
               </div>
-            </div>
-          ))}
-        </div>
-        {g.createdBy !== user?.id && (
-          <div className="mt-lg pt-md border-t border-line/40">
-            <Button variant="danger" onClick={handleLeaveGroup} disabled={leaveGroupMutation.loading}>
-              <span className="material-symbols-outlined text-[18px]">logout</span> Leave Group
-            </Button>
+            ))}
+            {expenses.loading && <Skeleton height={48} />}
+            {!expenses.loading && (expenses.data?.length ?? 0) === 0 && (
+              <EmptyState icon="receipt_long" title="No entries yet" description="Add the first expense for this circle."
+                action={{ label: 'Add expense', onClick: () => navigate(`/expenses/add?group=${g.id}`) }} />
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Expenses */}
-      <div className="bg-surface rounded-xl border border-line/40 p-lg">
-        <div className="flex items-center justify-between mb-md">
-          <h3 className="font-headline-sm text-headline-sm text-on-surface">Expenses</h3>
-          <button onClick={() => navigate(`/expenses/add?group=${g.id}`)} className="font-label-sm text-label-sm text-primary">Add</button>
-        </div>
-        <div className="flex flex-col gap-sm">
-          {(expenses.data ?? []).map(exp => (
-            <div key={exp.id} className="flex items-center gap-md p-md rounded-lg bg-surface-container-low hover:bg-surface-container-low/70 transition-colors">
-              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-primary text-[18px]">{CATEGORY_ICONS[exp.category ?? ''] ?? 'category'}</span>
+          {(settlements.data?.length ?? 0) > 0 && (
+            <div className="mt-xxl">
+              <h2 className="font-headline-sm text-on-surface">Settlements</h2>
+              <div className="mt-lg flex flex-col">
+                {(settlements.data ?? []).map(s => (
+                  <div key={s.id} className="timeline-dot relative flex items-center gap-md border-b border-line/70 py-md">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-label-md text-on-surface">{s.fromName} → {s.toName}</p>
+                      <p className="font-body-sm text-on-surface-variant">{formatDateTime(s.date)}</p>
+                    </div>
+                    <Badge variant={s.status === 'completed' ? 'success' : 'warning'} className="capitalize">{s.status}</Badge>
+                    <span className="num font-label-md text-secondary">{formatMoney(s.amountPaise)}</span>
+                  </div>
+                ))}
               </div>
-              <button className="flex-1 text-left min-w-0" onClick={() => navigate(`/expenses/${exp.id}`)}>
-                <p className="font-label-md text-label-md text-on-surface truncate">{exp.description}</p>
-                <p className="font-body-sm text-body-sm text-on-surface-variant">{exp.paidByName} · {exp.expenseDate}</p>
-              </button>
-              <div className="text-right">
-                <p className="font-label-md text-label-md text-on-surface">{formatMoney(exp.amountPaise)}</p>
-                <p className="font-body-sm text-body-sm text-on-surface-variant capitalize">{exp.splitMode}</p>
-              </div>
-              <button onClick={() => handleDeleteExpense(exp.id)} className="text-on-surface-variant hover:text-error p-xs" aria-label="Delete expense">
-                <span className="material-symbols-outlined text-[18px]">delete</span>
-              </button>
             </div>
-          ))}
-          {expenses.loading && <Skeleton height={48} />}
-          {!expenses.loading && (expenses.data?.length ?? 0) === 0 && (
-            <EmptyState
-              icon="receipt_long"
-              title="No expenses yet"
-              description="Add your first expense to start tracking."
-              action={{ label: 'Add Expense', onClick: () => navigate(`/expenses/add?group=${g.id}`) }}
-            />
           )}
         </div>
+
+        {/* Settle rail */}
+        <aside className="glass-card h-fit p-xl lg:sticky lg:top-24">
+          <h2 className="font-headline-sm text-on-surface">Balances</h2>
+          <p className="micro-label mt-1">Who's owed, who owes</p>
+          <div className="mt-lg flex flex-col">
+            {members.map(m => {
+              const owed = m.netPaise > 0
+              return (
+                <div key={m.userId} className="flex items-center gap-md border-b border-line/70 py-md">
+                  <BlobAvatar userId={m.userId} name={m.name} size={36} rounded="square" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-label-md text-on-surface">
+                      {m.name}{m.userId === user?.id ? ' (you)' : ''}
+                    </p>
+                    <p className="font-body-sm text-on-surface-variant">{owed ? 'owed to them' : m.netPaise < 0 ? 'they owe' : 'settled'}</p>
+                  </div>
+                  <span className={`num font-label-md ${owed ? 'text-secondary glow-mint' : m.netPaise < 0 ? 'text-primary glow-coral' : 'text-on-surface-variant'}`}>
+                    {formatMoney(Math.abs(m.netPaise))}
+                  </span>
+                  {isOwner && m.userId !== user?.id && (
+                    <button
+                      onClick={() => ask(`Remove ${m.name} from this group?`, async () => {
+                        await removeMember.mutate(m.userId)
+                        addToast(`${m.name} removed`, 'success')
+                        group.refetch()
+                        balances.refetch()
+                      })}
+                      aria-label={`Remove ${m.name}`}
+                      className="text-on-surface-variant transition-colors hover:text-primary"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">person_remove</span>
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <Button
+            className="mt-lg w-full"
+            variant="secondary"
+            onClick={() => setSettleOpen(true)}
+          >
+            <span className="material-symbols-outlined text-[18px]">payments</span> Settle up
+          </Button>
+          {!isOwner && (
+            <button
+              onClick={() => ask('Leave this group? Balances must be settled first.', async () => {
+                await leaveGroup.mutate()
+                addToast('You left the group', 'success')
+                navigate('/groups')
+              })}
+              className="mt-md w-full text-center font-body-sm text-on-surface-variant transition-colors hover:text-primary"
+            >
+              Leave group
+            </button>
+          )}
+        </aside>
       </div>
 
-      {/* Settlements */}
-      {(settlements.data?.length ?? 0) > 0 && (
-        <div className="bg-surface rounded-xl border border-line/40 p-lg">
-          <h3 className="font-headline-sm text-headline-sm text-on-surface mb-md">Settlements</h3>
-          <div className="flex flex-col gap-sm">
-            {(settlements.data ?? []).map(s => (
-              <div key={s.id} className="flex items-center gap-md p-md rounded-lg bg-surface-container-low">
-                <div className="w-9 h-9 rounded-full bg-success/10 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-success text-[18px]">payments</span>
-                </div>
-                <div className="flex-1">
-                  <p className="font-label-md text-label-md text-on-surface">{s.fromName} → {s.toName}</p>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">{s.date}</p>
-                </div>
-                <Badge variant={s.status === 'confirmed' ? 'success' : s.status === 'pending' ? 'warning' : 'danger'}>{s.status}</Badge>
-                <p className="font-label-md text-label-md text-primary">{formatMoney(s.amountPaise)}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <SettleModal
+        open={settleOpen}
+        onClose={() => setSettleOpen(false)}
+        groupId={id}
+        groupName={g.name}
+        members={members.map(m => ({ userId: m.userId, name: m.name }))}
+        onSettled={() => { settlements.refetch(); balances.refetch() }}
+      />
 
-      {/* Settle modal */}
-      <Modal isOpen={settleOpen} onClose={() => setSettleOpen(false)} title="Settle Up">
+      <Modal isOpen={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite someone" subtitle="They can join once they have an account.">
         <div className="flex flex-col gap-lg">
           <div className="flex flex-col gap-xs">
-            <label className="font-label-sm text-label-sm text-on-surface-variant">Pay to</label>
-            <Select
-              value={memberId}
-              onChange={setMemberId}
-              placeholder="Select a member"
-              options={members.filter(m => m.userId !== user?.id).map(m => ({ value: m.userId, label: m.name }))}
-            />
-          </div>
-          <div className="flex flex-col gap-xs">
-            <label className="font-label-sm text-label-sm text-on-surface-variant">Amount</label>
-            <div className="flex items-center gap-md px-md rounded-lg border border-line/40 bg-surface">
-              <span className="text-outline">₹</span>
-              <input
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                inputMode="decimal"
-                className="w-full h-12 bg-transparent text-on-surface font-body-md text-body-md outline-none"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-md">
-            <Button variant="secondary" onClick={() => setSettleOpen(false)}>Cancel</Button>
-            <Button onClick={handleSettle} disabled={createSettlement.loading || !memberId}>Record</Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Invite modal */}
-      <Modal isOpen={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite Member">
-        <div className="flex flex-col gap-lg">
-          <div className="flex flex-col gap-xs">
-            <label className="font-label-sm text-label-sm text-on-surface-variant">Email</label>
-            <input
-              value={inviteEmail}
-              onChange={e => setInviteEmail(e.target.value)}
+            <label className="micro-label" htmlFor="invite-email">Email address</label>
+            <input id="invite-email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
               placeholder="friend@example.com"
-              className="w-full h-12 px-md rounded-lg border border-line/40 bg-surface"
-            />
+              className="h-11 w-full rounded-xl border border-line bg-surface-container-low/80 px-md font-body-md outline-none focus:border-primary" />
           </div>
           <div className="flex justify-end gap-md">
             <Button variant="secondary" onClick={() => setInviteOpen(false)}>Cancel</Button>
-            <Button onClick={handleInvite} disabled={invite.loading}>Send Invite</Button>
+            <Button onClick={handleInvite} disabled={invite.loading}>Send invite</Button>
           </div>
         </div>
       </Modal>
 
-      {/* Confirm modal */}
-      <Modal isOpen={confirmOpen} onClose={() => { setConfirmOpen(false); setConfirmAction(null) }} title="Confirm">
-        <div className="flex flex-col gap-lg">
-          <p className="font-body-md text-body-md text-on-surface">{confirmMessage}</p>
-          <div className="flex justify-end gap-md">
-            <Button variant="secondary" onClick={() => { setConfirmOpen(false); setConfirmAction(null) }}>Cancel</Button>
-            <Button variant="danger" onClick={handleConfirm} disabled={leaveGroupMutation.loading || removeMemberMutation.loading}>Confirm</Button>
-          </div>
+      <Modal isOpen={confirmOpen} onClose={() => { setConfirmOpen(false); setConfirmAction(null) }}
+        title="Are you sure?" subtitle={confirmMessage}>
+        <div className="flex justify-end gap-md">
+          <Button variant="secondary" onClick={() => { setConfirmOpen(false); setConfirmAction(null) }}>Cancel</Button>
+          <Button variant="danger" onClick={handleConfirm}>Confirm</Button>
         </div>
       </Modal>
     </div>

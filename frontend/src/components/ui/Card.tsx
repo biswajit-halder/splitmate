@@ -6,12 +6,10 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
   ({ elevation = 1, className = '', ...props }, ref) => {
-    const shadowClass = elevation === 1 ? 'shadow-level-1' : 'shadow-level-2'
-    
     return (
       <div
         ref={ref}
-        className={`rounded-lg border border-outline-variant bg-surface p-lg ${shadowClass} ${className}`}
+        className={`glass-card p-lg ${elevation === 2 ? 'shadow-level-2' : ''} ${className}`}
         {...props}
       />
     )

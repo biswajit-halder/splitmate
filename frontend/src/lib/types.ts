@@ -6,7 +6,7 @@ export interface User {
 }
 
 export interface AuthResult {
-  token: string
+  // The session token lives in an httpOnly cookie; it is never exposed to JS.
   user: User
 }
 
@@ -78,6 +78,7 @@ export interface ExpenseSummary {
   splitMode: string
   paidBy: string
   paidByName: string
+  canEdit: boolean
 }
 
 export interface ExpenseSplit {
@@ -99,6 +100,8 @@ export interface ExpenseDetail {
   paidBy: string
   paidByName: string
   createdAt: string
+  /** True when the current user may edit/delete the expense (payer or group owner). */
+  canEdit: boolean
   splits: ExpenseSplit[]
 }
 
@@ -107,7 +110,7 @@ export interface Settlement {
   groupId?: string
   groupName?: string
   amountPaise: number
-  status: 'pending' | 'confirmed' | 'declined'
+  status: 'pending' | 'completed'
   date: string
   fromName: string
   toName: string
@@ -120,6 +123,7 @@ export interface Balances {
   netPaise: number
   owedPaise: number
   owePaise: number
+  settledPaise: number
   groups: Array<{
     groupId: string
     groupName: string
@@ -128,6 +132,7 @@ export interface Balances {
     iconColor: string | null
     netPaise: number
   }>
+  counterparties: Array<{ userId: string; name: string; netPaise: number }>
 }
 
 export interface GroupBalanceMember {
@@ -141,6 +146,8 @@ export interface GroupBalanceMember {
 export interface GroupBalances {
   members: GroupBalanceMember[]
   sumPaise: number
+  /** Pairwise position of the current user: positive = they owe you, negative = you owe them. */
+  myBalances: Array<{ userId: string; netPaise: number }>
 }
 
 export interface AnalyticsMonthly {

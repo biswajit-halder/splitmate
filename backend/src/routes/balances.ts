@@ -35,10 +35,55 @@ balanceRoutes.get('/balances', async (c) => {
   const totalOwed = rows.results.filter((r) => r.net_paise > 0).reduce((a, r) => a + r.net_paise, 0)
   const totalOwe = rows.results.filter((r) => r.net_paise < 0).reduce((a, r) => a - r.net_paise, 0)
 
+  // Pairwise positions across all groups: positive = they owe the user,
+  // negative = the user owes them. Used by the dashboard's settle board.
+  const relevant = await DB.prepare(
+    'SELECT user_id, counterpart_id, net_amount_paise FROM balances WHERE user_id = ? OR counterpart_id = ?'
+  )
+    .bind(userId, userId)
+    .all<{ user_id: string; counterpart_id: string; net_amount_paise: number }>()
+
+  const pairwise = new Map<string, number>()
+  for (const row of relevant.results) {
+    if (row.user_id === userId) {
+      pairwise.set(row.counterpart_id, (pairwise.get(row.counterpart_id) ?? 0) + row.net_amount_paise)
+    } else {
+      pairwise.set(row.user_id, (pairwise.get(row.user_id) ?? 0) - row.net_amount_paise)
+    }
+  }
+
+  const counterpartIds = [...pairwise.keys()]
+  const names = new Map<string, string>()
+  if (counterpartIds.length > 0) {
+    const placeholders = counterpartIds.map(() => '?').join(', ')
+    const users = await DB.prepare(`SELECT id, name FROM users WHERE id IN (${placeholders})`)
+      .bind(...counterpartIds)
+      .all<{ id: string; name: string }>()
+    for (const u of users.results) names.set(u.id, u.name)
+  }
+
+  const counterparties = [...pairwise.entries()]
+    .filter(([, netPaise]) => netPaise !== 0)
+    .map(([otherUserId, netPaise]) => ({
+      userId: otherUserId,
+      name: names.get(otherUserId) ?? 'Member',
+      netPaise,
+    }))
+    .sort((a, b) => Math.abs(b.netPaise) - Math.abs(a.netPaise))
+
+  const settledThisMonth = await DB.prepare(
+    `SELECT COALESCE(SUM(amount_paise), 0) AS total FROM settlements
+     WHERE status = 'completed' AND (payer_id = ? OR payee_id = ?)
+       AND substr(created_at, 1, 7) = ?`
+  )
+    .bind(userId, userId, new Date().toISOString().slice(0, 7))
+    .first<{ total: number }>()
+
   return c.json({
     netPaise: totalOwed - totalOwe,
     owedPaise: totalOwed,
     owePaise: totalOwe,
+    settledPaise: settledThisMonth?.total ?? 0,
     groups: rows.results.map((r) => ({
       groupId: r.group_id,
       groupName: r.group_name,
@@ -47,6 +92,7 @@ balanceRoutes.get('/balances', async (c) => {
       iconColor: r.icon_color,
       netPaise: r.net_paise ?? 0,
     })),
+    counterparties,
   })
 })
 
@@ -78,7 +124,27 @@ balanceRoutes.get('/groups/:id/balances', async (c) => {
     netPaise: net.get(m.id) ?? 0,
   }))
 
-  return c.json({ members: memberBalances, sumPaise: memberBalances.reduce((a, m) => a + m.netPaise, 0) })
+  // Pairwise position of the requesting user: positive means the other member
+  // owes them, negative means they owe the other member. This is what the
+  // UI needs to record a settlement in the correct direction.
+  const userId = c.get('userId')
+  const pairwise = new Map<string, number>()
+  for (const row of balances.results) {
+    if (row.user_id === userId) {
+      pairwise.set(row.counterpart_id, (pairwise.get(row.counterpart_id) ?? 0) + row.net_amount_paise)
+    } else if (row.counterpart_id === userId) {
+      pairwise.set(row.user_id, (pairwise.get(row.user_id) ?? 0) - row.net_amount_paise)
+    }
+  }
+
+  return c.json({
+    members: memberBalances,
+    sumPaise: memberBalances.reduce((a, m) => a + m.netPaise, 0),
+    myBalances: [...pairwise.entries()].map(([otherUserId, netPaise]) => ({
+      userId: otherUserId,
+      netPaise,
+    })),
+  })
 })
 
 balanceRoutes.post('/groups/:id/simplify-debts', async (c) => {

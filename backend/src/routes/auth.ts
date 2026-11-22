@@ -51,7 +51,9 @@ authRoutes.post('/register', loginRateLimit, async (c) => {
   const token = await signToken({ sub: id, email: body.email.toLowerCase() }, c.env.JWT_SECRET)
   // Registering always starts a session; honor "remember" when provided.
   setSessionCookie(c, token, body.remember ? 2592000 : undefined)
-  return c.json({ token, user: { id, email: body.email.toLowerCase(), name: body.name, avatar_bg: body.avatar_bg ?? null } }, 201)
+  // The token itself is deliberately NOT returned in the body: the session
+  // lives in an httpOnly cookie so that XSS cannot read it.
+  return c.json({ user: { id, email: body.email.toLowerCase(), name: body.name, avatar_bg: body.avatar_bg ?? null } }, 201)
 })
 
 authRoutes.post('/login', loginRateLimit, async (c) => {
@@ -70,7 +72,9 @@ authRoutes.post('/login', loginRateLimit, async (c) => {
   const token = await signToken({ sub: row.id, email: row.email }, c.env.JWT_SECRET)
   // "Remember me" -> 30d cookie; otherwise a session cookie cleared on browser close.
   setSessionCookie(c, token, body.remember ? 2592000 : undefined)
-  return c.json({ token, user: { id: row.id, email: row.email, name: row.name, avatar_bg: row.avatar_bg } })
+  // The token itself is deliberately NOT returned in the body: the session
+  // lives in an httpOnly cookie so that XSS cannot read it.
+  return c.json({ user: { id: row.id, email: row.email, name: row.name, avatar_bg: row.avatar_bg } })
 })
 
 authRoutes.post('/logout', (c) => {

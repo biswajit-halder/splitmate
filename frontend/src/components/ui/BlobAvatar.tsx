@@ -1,46 +1,43 @@
+import { getAvatarPair, getInitials } from '../../lib/avatarColors'
+
 interface BlobAvatarProps {
   userId: string
   name: string
   size?: number
   className?: string
-}
-
-const AVATAR_PAIRS = [
-  { bg: '#A64B2A', text: '#F1EAE0' },
-  { bg: '#6B7A4F', text: '#FBF7F1' },
-  { bg: '#D9A441', text: '#2A2620' },
-  { bg: '#7E381E', text: '#F1EAE0' },
-  { bg: '#4E5A38', text: '#FBF7F1' },
-]
-
-function getAvatarPair(userId: string) {
-  const hash = [...userId].reduce((acc, char) => acc + char.charCodeAt(0), 0)
-  return AVATAR_PAIRS[hash % AVATAR_PAIRS.length]
+  rounded?: 'blob' | 'circle' | 'square'
 }
 
 const BLOB_PATH = 'M50 6C68 6 88 20 92 42C96 64 82 88 58 93C34 98 10 82 6 58C2 34 22 6 50 6Z'
 
-export function BlobAvatar({ userId, name, size = 40, className = '' }: BlobAvatarProps) {
-  const { bg, text } = getAvatarPair(userId)
-  const initials = name.slice(0, 2).toUpperCase()
-  const filterId = `grain-${userId}`
+export function BlobAvatar({ userId, name, size = 40, className = '', rounded = 'blob' }: BlobAvatarProps) {
+  const { gradient, text } = getAvatarPair(userId)
+  const initials = getInitials(name)
+  const gradientId = `avatar-gradient-${userId.replace(/[^a-zA-Z0-9]/g, '')}`
+  const shape = rounded === 'circle'
+    ? <circle cx="50" cy="50" r="46" fill={`url(#${gradientId})`} />
+    : rounded === 'square'
+      ? <rect x="4" y="4" width="92" height="92" rx="22" fill={`url(#${gradientId})`} />
+      : <path d={BLOB_PATH} fill={`url(#${gradientId})`} />
 
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" className={className}>
+    <svg width={size} height={size} viewBox="0 0 100 100" className={className} role="img" aria-label={name}>
       <defs>
-        <filter id={filterId}>
-          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" result="noise" />
-          <feColorMatrix in="noise" type="matrix"
-            values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.04 0" />
-          <feComposite operator="over" in2="SourceGraphic" />
-        </filter>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={gradient[0]} />
+          <stop offset="100%" stopColor={gradient[1]} />
+        </linearGradient>
       </defs>
-      <path
-        d={BLOB_PATH}
-        fill={bg}
-        filter={`url(#${filterId})`}
-      />
-      <text x="50" y="57" textAnchor="middle" fontFamily="'Karla', sans-serif" fontWeight="700" fontSize="26" fill={text}>
+      {shape}
+      <text
+        x="50"
+        y="57"
+        textAnchor="middle"
+        fontFamily="'Karla', sans-serif"
+        fontWeight="700"
+        fontSize={initials.length > 2 ? 21 : 27}
+        fill={text}
+      >
         {initials}
       </text>
     </svg>

@@ -33,7 +33,7 @@ export function FriendsPage() {
       setAddOpen(false)
       requests.refetch()
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to send', 'error' as never)
+      addToast(err instanceof Error ? err.message : 'Failed to send', 'error')
     }
   }
 
@@ -44,7 +44,7 @@ export function FriendsPage() {
       requests.refetch()
       friends.refetch()
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed', 'error' as never)
+      addToast(err instanceof Error ? err.message : 'Failed', 'error')
     }
   }
 
@@ -53,7 +53,7 @@ export function FriendsPage() {
       await reject.mutate(rid)
       requests.refetch()
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed', 'error' as never)
+      addToast(err instanceof Error ? err.message : 'Failed', 'error')
     }
   }
 
@@ -63,7 +63,7 @@ export function FriendsPage() {
       addToast('Friend removed', 'success')
       friends.refetch()
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to remove friend', 'error' as never)
+      addToast(err instanceof Error ? err.message : 'Failed to remove friend', 'error')
     }
   }
 
@@ -73,7 +73,7 @@ export function FriendsPage() {
       addToast('Request cancelled', 'success')
       requests.refetch()
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to cancel request', 'error' as never)
+      addToast(err instanceof Error ? err.message : 'Failed to cancel request', 'error')
     }
   }
 
@@ -85,7 +85,7 @@ export function FriendsPage() {
     <div className="flex flex-col gap-xl max-w-content">
       <div className="flex items-start justify-between flex-wrap gap-md">
         <div>
-          <h2 className="font-headline-lg md:font-headline-xl text-headline-lg md:text-headline-xl text-on-surface">Friends</h2>
+          <h1 className="font-headline-lg text-headline-lg text-on-surface">Friends</h1>
           <p className="font-body-md text-body-md text-on-surface-variant mt-xs">Manage your connections and settle up easily.</p>
         </div>
         <Button onClick={() => setAddOpen(true)} className="flex items-center gap-2">
@@ -112,7 +112,7 @@ export function FriendsPage() {
         <div className="grid grid-cols-1 gap-lg sm:grid-cols-2 lg:grid-cols-3">
           {friends.loading && <Skeleton height={120} />}
           {(friends.data ?? []).map(f => (
-            <div key={f.id} className="bg-surface rounded-xl border border-line/40 p-lg hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+            <div key={f.id} className="glass-card pressable p-lg">
               <div className="flex items-center gap-md mb-md">
                 <BlobAvatar userId={f.id} name={f.name} size={48} />
                 <div className="min-w-0">
@@ -121,7 +121,7 @@ export function FriendsPage() {
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className={`font-label-md text-label-md ${f.balancePaise > 0 ? 'text-success' : f.balancePaise < 0 ? 'text-error' : 'text-on-surface-variant'}`}>
+                <span className={`num rounded-full px-2.5 py-1 font-label-md ${f.balancePaise > 0 ? 'tint-mint' : f.balancePaise < 0 ? 'tint-coral' : 'tint-lilac'}`}>
                   {formatMoney(f.balancePaise)}
                 </span>
                 <div className="flex gap-2">

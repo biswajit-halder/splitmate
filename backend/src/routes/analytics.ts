@@ -17,16 +17,29 @@ analyticsRoutes.get('/analytics/monthly', async (c) => {
   const month = monthRaw ?? new Date().toISOString().slice(0, 7)
   const { DB } = c.env
 
-  const rows = await DB.prepare(
-    'SELECT month, total_paise, settled_paise FROM spending_summary_monthly WHERE user_id = ? AND month = ?'
+  // Computed from the source tables so edits/deletes are always reflected
+  // (the old denormalised summary table drifted out of sync).
+  const spent = await DB.prepare(
+    `SELECT COALESCE(SUM(amount_paise), 0) AS total
+     FROM expenses WHERE paid_by = ? AND substr(expense_date, 1, 7) = ?`
   )
     .bind(userId, month)
-    .all<{ month: string; total_paise: number; settled_paise: number }>()
+    .first<{ total: number }>()
+
+  const settled = await DB.prepare(
+    `SELECT COALESCE(SUM(amount_paise), 0) AS total
+     FROM settlements
+     WHERE status = 'completed'
+       AND (payer_id = ? OR payee_id = ?)
+       AND substr(created_at, 1, 7) = ?`
+  )
+    .bind(userId, userId, month)
+    .first<{ total: number }>()
 
   return c.json({
     month,
-    totalPaise: rows.results.reduce((a, r) => a + r.total_paise, 0),
-    settledPaise: rows.results.reduce((a, r) => a + r.settled_paise, 0),
+    totalPaise: spent?.total ?? 0,
+    settledPaise: settled?.total ?? 0,
   })
 })
 
@@ -57,8 +70,9 @@ analyticsRoutes.get('/analytics/breakdown', async (c) => {
 
   const largest = await DB.prepare(
     `SELECT e.id, e.description, e.amount_paise, u.name AS paid_by_name
-     FROM expenses e JOIN users u ON u.id = e.paid_by
-     WHERE e.group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)
+     FROM expenses e
+     JOIN users u ON u.id = e.paid_by
+     WHERE e.id IN (SELECT expense_id FROM expense_splits WHERE user_id = ?)
      ORDER BY e.amount_paise DESC LIMIT 5`
   )
     .bind(userId)
