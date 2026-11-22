@@ -401,9 +401,21 @@
   .divider { height: 1px; background: var(--color-line); }
 }
 
-/* Tailwind v4 drops this one custom spacing utility from @layer utilities;
-   declare it at top level so `mt-xxl` keeps its intended spacing. */
+/* Tailwind v4 drops some custom spacing utilities from @layer utilities;
+   declare them at top level so they keep their intended values. */
 .mt-xxl { margin-top: var(--space-xxl); }
+.top-lg { top: var(--space-lg); }
+.right-lg { right: var(--space-lg); }
+.bottom-lg { bottom: var(--space-lg); }
+.left-lg { left: var(--space-lg); }
+.top-md { top: var(--space-md); }
+.right-md { right: var(--space-md); }
+.bottom-md { bottom: var(--space-md); }
+.left-md { left: var(--space-md); }
+.top-sm { top: var(--space-sm); }
+.right-sm { right: var(--space-sm); }
+.bottom-sm { bottom: var(--space-sm); }
+.left-sm { left: var(--space-sm); }
 
 /* Interactive focus states */
 a:focus-visible,

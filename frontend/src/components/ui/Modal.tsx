@@ -14,6 +14,10 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
 export function Modal({ isOpen, onClose, title, subtitle, children, className = '' }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
+  // Keep the latest callback without re-running the focus/keydown effect on
+  // every parent render (otherwise typing in a field steals focus back).
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
     if (!isOpen) return
@@ -23,13 +27,15 @@ export function Modal({ isOpen, onClose, title, subtitle, children, className = 
 
     // Move focus into the dialog so keyboard users land inside it.
     requestAnimationFrame(() => {
-      const first = dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE)
+      const first =
+        dialogRef.current?.querySelector<HTMLElement>('input, textarea, select') ??
+        dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE)
       ;(first ?? dialogRef.current)?.focus()
     })
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose()
+        onCloseRef.current()
         return
       }
       if (e.key !== 'Tab' || !dialogRef.current) return
@@ -53,7 +59,7 @@ export function Modal({ isOpen, onClose, title, subtitle, children, className = 
       document.removeEventListener('keydown', onKey)
       previous?.focus?.()
     }
-  }, [isOpen, onClose])
+  }, [isOpen])
 
   if (!isOpen) return null
 
