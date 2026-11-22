@@ -3,7 +3,11 @@ interface BrandMarkProps {
   className?: string
 }
 
-/** Two nested arcs: one whole, one split — the SplitMate mark. */
+/**
+ * Two nested arcs: one whole, one split — the SplitMate mark.
+ * Uses currentColor so it stays visible inside the coloured logo tile;
+ * callers pass a contrasting text colour (dark on the bright gradient).
+ */
 export function BrandMark({ size = 36, className = '' }: BrandMarkProps) {
   return (
     <svg
@@ -15,26 +19,20 @@ export function BrandMark({ size = 36, className = '' }: BrandMarkProps) {
       aria-hidden="true"
       focusable="false"
     >
-      <defs>
-        <linearGradient id="brand-gradient" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="var(--color-primary)" />
-          <stop offset="100%" stopColor="#B69CFF" />
-        </linearGradient>
-      </defs>
       <path
         d="M20 4a16 16 0 1 0 16 16"
-        stroke="url(#brand-gradient)"
+        stroke="currentColor"
         strokeWidth="4.5"
         strokeLinecap="round"
       />
       <path
         d="M20 11a9 9 0 0 1 9 9"
-        stroke="url(#brand-gradient)"
+        stroke="currentColor"
         strokeWidth="4.5"
         strokeLinecap="round"
-        opacity="0.5"
+        opacity="0.55"
       />
-      <circle cx="20" cy="20" r="2.6" fill="url(#brand-gradient)" />
+      <circle cx="20" cy="20" r="2.6" fill="currentColor" />
     </svg>
   )
 }

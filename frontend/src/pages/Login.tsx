@@ -91,7 +91,7 @@ export function LoginPage() {
           {/* Header */}
           <div className="mb-xl flex flex-col items-center text-center">
             <div className="mb-md flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-[#B69CFF] shadow-[0_0_26px_rgba(255,107,94,0.35)]">
-              <BrandMark size={28} />
+              <BrandMark size={28} className="text-[#241016]" />
             </div>
             <h1 className="font-headline-lg text-on-surface">Welcome back</h1>
             <p className="mt-xs font-body-md text-body-md text-on-surface-variant">
