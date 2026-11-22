@@ -16,7 +16,7 @@ export async function sendEmail(env: AppEnv['Bindings'], to: string, subject: st
         'content-type': 'application/json',
         ...(env.EMAIL_WEBHOOK_TOKEN ? { authorization: `Bearer ${env.EMAIL_WEBHOOK_TOKEN}` } : {}),
       },
-      body: JSON.stringify({ to, subject, text }),
+      body: JSON.stringify({ ...(env.EMAIL_FROM ? { from: env.EMAIL_FROM } : {}), to, subject, text }),
     })
     return res.ok
   } catch {

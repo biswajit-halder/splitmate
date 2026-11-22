@@ -8,6 +8,7 @@ export interface Bindings {
   /** Optional email webhook for password resets and settlement reminders. */
   EMAIL_WEBHOOK_URL?: string
   EMAIL_WEBHOOK_TOKEN?: string
+  EMAIL_FROM?: string
   /** Dev-only: include the reset token in the API response when no email is configured. */
   DEV_RESET_TOKEN?: string
 }

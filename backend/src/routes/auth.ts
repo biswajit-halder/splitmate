@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { deleteCookie, setCookie } from 'hono/cookie'
 import { z } from 'zod'
-import { BadRequestError, ConflictError, UnauthorizedError } from '../errors/AppError'
+import { AppError, BadRequestError, ConflictError, UnauthorizedError } from '../errors/AppError'
 import { hashPassword, hashToken, signToken, verifyPassword } from '../lib/auth'
 import { sendEmail } from '../lib/email'
 import { COOKIE_NAME } from '../middleware/auth'
@@ -172,7 +172,10 @@ authRoutes.post('/email/code', loginRateLimit, async (c) => {
     .run()
 
   const sent = await sendEmail(c.env, normalized, 'Your SplitMate code', `Your sign-in code is ${code}. It expires in 10 minutes.`)
-  if (!sent && c.env.DEV_RESET_TOKEN === 'true') return c.json({ ok: true, devCode: code })
+  if (!sent) {
+    if (c.env.DEV_RESET_TOKEN === 'true') return c.json({ ok: true, devCode: code })
+    throw new AppError('Email delivery is unavailable. Please use password sign-in.', 503, 'EMAIL_UNAVAILABLE')
+  }
   return c.json({ ok: true })
 })
 
