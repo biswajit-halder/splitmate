@@ -7,7 +7,7 @@ export function AccentSwitcher({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex flex-col gap-xs">
       {!compact && <p className="eyebrow">Accent signal</p>}
-      <div className="flex gap-sm">
+      <div className="flex min-w-0 gap-xs">
         {ACCENTS.map(a => (
           <button
             key={a.key}
@@ -15,7 +15,7 @@ export function AccentSwitcher({ compact = false }: { compact?: boolean }) {
             onClick={() => setAccent(a.key)}
             title={`${a.label} accent`}
             aria-label={`${a.label} accent`}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-sm py-1.5 font-label-sm transition-all ${
+            className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1 py-1.5 text-[11px] leading-none transition-all ${
               accent === a.key
                 ? 'border-[color:var(--accent)] text-on-surface glow-shadow'
                 : 'border-line text-on-surface-variant hover:border-outline'
