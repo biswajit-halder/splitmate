@@ -1,0 +1,18 @@
+{
+  "name": "SplitMate",
+  "short_name": "SplitMate",
+  "description": "Share expenses, settle up, stay friends.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#1B1325",
+  "theme_color": "#1B1325",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

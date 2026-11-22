@@ -4,25 +4,15 @@ import { formatMoney } from '../lib/money'
 import { formatMonth } from '../lib/dates'
 import { Skeleton } from '../components/ui'
 
-function lastMonths(count: number): string[] {
-  const out: string[] = []
-  const now = new Date()
-  for (let i = count - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
-  }
-  return out
-}
-
 export function AnalyticsPage() {
-  const months = lastMonths(6)
-  const trend = useApi(() => Promise.all(months.map(m => analyticsApi.monthly(m))))
+  const trend = useApi(() => analyticsApi.trend(6))
   const breakdown = useApi(() => analyticsApi.breakdown())
 
-  const spend = (trend.data ?? []).map(m => m.totalPaise)
-  const settled = (trend.data ?? []).map(m => m.settledPaise)
+  const months = trend.data?.months ?? []
+  const spend = months.map(m => m.totalPaise)
+  const settled = months.map(m => m.settledPaise)
   const maxSpend = Math.max(1, ...spend)
-  const current = trend.data?.[trend.data.length - 1]
+  const current = months[months.length - 1]
   const cats = breakdown.data?.byCategory ?? []
   const catMax = Math.max(1, ...cats.map(c => c.totalPaise))
   const groups = breakdown.data?.byGroup ?? []
@@ -59,7 +49,7 @@ export function AnalyticsPage() {
             <div className="absolute inset-x-0 top-0 h-px bg-line" />
             <div className="absolute inset-x-0 top-1/2 h-px bg-line/50" />
             {months.map((m, i) => (
-              <div key={m} className="group flex h-full flex-1 flex-col items-center justify-end gap-sm">
+              <div key={m.month} className="group flex h-full flex-1 flex-col items-center justify-end gap-sm">
                 <div className="relative flex w-full flex-1 items-end justify-center gap-1">
                   <div
                     className="w-1/2 max-w-12 rounded-t-lg bg-gradient-to-t from-primary/30 to-primary shadow-[0_0_22px_rgba(255,107,94,0.25)] transition-all duration-500 group-hover:from-primary/50"

@@ -10,6 +10,51 @@ export const analyticsRoutes = new Hono<AppEnv>()
 
 analyticsRoutes.use('*', requireAuth)
 
+/** One request for the whole dashboard trend instead of N monthly calls. */
+analyticsRoutes.get('/analytics/trend', async (c) => {
+  const userId = c.get('userId')
+  const raw = c.req.query('months')
+  const months = raw ? Number(raw) : 6
+  if (!Number.isInteger(months) || months < 1 || months > 12) {
+    throw new BadRequestError('months must be between 1 and 12')
+  }
+
+  const { DB } = c.env
+  const now = new Date()
+  const keys = Array.from({ length: months }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
+  const start = `${keys[0]}-01`
+
+  const spentRows = await DB.prepare(
+    `SELECT substr(expense_date, 1, 7) AS month, COALESCE(SUM(amount_paise), 0) AS total
+     FROM expenses WHERE paid_by = ? AND deleted_at IS NULL AND expense_date >= ? GROUP BY month`
+  )
+    .bind(userId, start)
+    .all<{ month: string; total: number }>()
+
+  const settledRows = await DB.prepare(
+    `SELECT substr(created_at, 1, 7) AS month, COALESCE(SUM(amount_paise), 0) AS total
+     FROM settlements
+     WHERE status = 'completed' AND (payer_id = ? OR payee_id = ?) AND created_at >= ?
+     GROUP BY month`
+  )
+    .bind(userId, userId, start)
+    .all<{ month: string; total: number }>()
+
+  const spent = new Map(spentRows.results.map(r => [r.month, r.total]))
+  const settled = new Map(settledRows.results.map(r => [r.month, r.total]))
+
+  return c.json({
+    months: keys.map(month => ({
+      month,
+      totalPaise: spent.get(month) ?? 0,
+      settledPaise: settled.get(month) ?? 0,
+    })),
+  })
+})
+
 analyticsRoutes.get('/analytics/monthly', async (c) => {
   const userId = c.get('userId')
   const monthRaw = c.req.query('month')
@@ -21,7 +66,7 @@ analyticsRoutes.get('/analytics/monthly', async (c) => {
   // (the old denormalised summary table drifted out of sync).
   const spent = await DB.prepare(
     `SELECT COALESCE(SUM(amount_paise), 0) AS total
-     FROM expenses WHERE paid_by = ? AND substr(expense_date, 1, 7) = ?`
+     FROM expenses WHERE paid_by = ? AND deleted_at IS NULL AND substr(expense_date, 1, 7) = ?`
   )
     .bind(userId, month)
     .first<{ total: number }>()
@@ -52,7 +97,7 @@ analyticsRoutes.get('/analytics/breakdown', async (c) => {
      FROM expenses e
      JOIN expense_splits es ON es.expense_id = e.id
      JOIN groups g ON g.id = e.group_id
-     WHERE es.user_id = ? AND e.paid_by != ?
+     WHERE es.user_id = ? AND e.paid_by != ? AND e.deleted_at IS NULL
      GROUP BY g.id ORDER BY total_paise DESC`
   )
     .bind(userId, userId)
@@ -62,7 +107,7 @@ analyticsRoutes.get('/analytics/breakdown', async (c) => {
     `SELECT COALESCE(e.category, 'other') AS category, COALESCE(SUM(es.amount_paise), 0) AS total_paise
      FROM expenses e
      JOIN expense_splits es ON es.expense_id = e.id
-     WHERE es.user_id = ? AND e.paid_by != ?
+     WHERE es.user_id = ? AND e.paid_by != ? AND e.deleted_at IS NULL
      GROUP BY category ORDER BY total_paise DESC`
   )
     .bind(userId, userId)
@@ -72,7 +117,7 @@ analyticsRoutes.get('/analytics/breakdown', async (c) => {
     `SELECT e.id, e.description, e.amount_paise, u.name AS paid_by_name
      FROM expenses e
      JOIN users u ON u.id = e.paid_by
-     WHERE e.id IN (SELECT expense_id FROM expense_splits WHERE user_id = ?)
+     WHERE e.deleted_at IS NULL AND e.id IN (SELECT expense_id FROM expense_splits WHERE user_id = ?)
      ORDER BY e.amount_paise DESC LIMIT 5`
   )
     .bind(userId)

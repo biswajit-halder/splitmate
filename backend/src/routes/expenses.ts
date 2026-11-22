@@ -69,7 +69,8 @@ async function assertCanManageExpense(
 
 async function getExpense(env: AppEnv['Bindings'], expenseId: string) {
   return env.DB.prepare(
-    `SELECT e.*, u.name AS paid_by_name FROM expenses e JOIN users u ON u.id = e.paid_by WHERE e.id = ?`
+    `SELECT e.*, u.name AS paid_by_name FROM expenses e JOIN users u ON u.id = e.paid_by
+     WHERE e.id = ? AND e.deleted_at IS NULL`
   )
     .bind(expenseId)
     .first<ExpenseRow & { paid_by_name: string }>()
@@ -95,7 +96,9 @@ expenseRoutes.post('/groups/:id/expenses', async (c) => {
   const body = createExpenseSchema.parse(await c.req.json())
   const { DB } = c.env
 
-  const group = await DB.prepare('SELECT id, name FROM groups WHERE id = ?').bind(groupId).first<{ id: string; name: string }>()
+  const group = await DB.prepare('SELECT id, name, currency FROM groups WHERE id = ?')
+    .bind(groupId)
+    .first<{ id: string; name: string; currency: string | null }>()
   if (!group) throw new NotFoundError('Group not found')
 
   // The payer and every participant must be an active member of the group,
@@ -115,7 +118,7 @@ expenseRoutes.post('/groups/:id/expenses', async (c) => {
   const statements: D1PreparedStatement[] = [
     DB.prepare(
       'INSERT INTO expenses (id, group_id, paid_by, amount_paise, currency, description, category, split_mode, expense_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(expenseId, groupId, body.paidBy, body.amountPaise, 'INR', body.description, body.category ?? null, body.splitMode, expenseDate, created, created),
+    ).bind(expenseId, groupId, body.paidBy, body.amountPaise, group.currency ?? 'INR', body.description, body.category ?? null, body.splitMode, expenseDate, created, created),
   ]
 
   for (const s of splits) {
@@ -165,7 +168,7 @@ expenseRoutes.get('/groups/:id/expenses', async (c) => {
   const rows = await DB.prepare(
     `SELECT e.id, e.description, e.amount_paise, e.expense_date, e.category, e.split_mode, e.paid_by, u.name AS paid_by_name
      FROM expenses e JOIN users u ON u.id = e.paid_by
-     WHERE e.group_id = ?
+     WHERE e.group_id = ? AND e.deleted_at IS NULL
      ORDER BY e.expense_date DESC, e.created_at DESC`
   )
     .bind(groupId)
@@ -228,6 +231,7 @@ expenseRoutes.get('/expenses/:id', async (c) => {
       splitMode: expense.split_mode,
       paidBy: expense.paid_by,
       paidByName: expense.paid_by_name,
+      currency: expense.currency,
       createdAt: expense.created_at,
       canEdit,
       splits: splits.results,
@@ -368,9 +372,9 @@ expenseRoutes.delete('/expenses/:id', async (c) => {
     .all<{ user_id: string; amount_paise: number }>()
 
   const now = nowIso()
+  // Soft delete: keep the splits so the entry can be restored with Undo.
   const statements: D1PreparedStatement[] = [
-    DB.prepare('DELETE FROM expense_splits WHERE expense_id = ?').bind(expenseId),
-    DB.prepare('DELETE FROM expenses WHERE id = ?').bind(expenseId),
+    DB.prepare('UPDATE expenses SET deleted_at = ?, updated_at = ? WHERE id = ?').bind(now, now, expenseId),
   ]
   for (const s of splits.results) {
     if (s.user_id === expense.paid_by) continue
@@ -384,6 +388,51 @@ expenseRoutes.delete('/expenses/:id', async (c) => {
     )
   }
 
+  await DB.batch(statements)
+  return c.json({ ok: true })
+})
+
+/** Restore a soft-deleted expense and re-book its balances. */
+expenseRoutes.post('/expenses/:id/restore', async (c) => {
+  const expenseId = c.req.param('id')
+  const userId = c.get('userId')
+  const { DB } = c.env
+
+  const expense = await DB.prepare(
+    `SELECT e.*, u.name AS paid_by_name FROM expenses e JOIN users u ON u.id = e.paid_by
+     WHERE e.id = ? AND e.deleted_at IS NOT NULL`
+  )
+    .bind(expenseId)
+    .first<ExpenseRow & { paid_by_name: string }>()
+  if (!expense) throw new NotFoundError('Deleted expense not found')
+
+  const membership = await DB.prepare(
+    "SELECT id FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'active'"
+  )
+    .bind(expense.group_id, userId)
+    .first()
+  if (!membership) throw new ForbiddenError('You are not an active member of this group')
+  await assertCanManageExpense(c, expense)
+
+  const splits = await DB.prepare('SELECT user_id, amount_paise FROM expense_splits WHERE expense_id = ?')
+    .bind(expenseId)
+    .all<{ user_id: string; amount_paise: number }>()
+
+  const now = nowIso()
+  const statements: D1PreparedStatement[] = [
+    DB.prepare('UPDATE expenses SET deleted_at = NULL, updated_at = ? WHERE id = ?').bind(now, expenseId),
+  ]
+  for (const s of splits.results) {
+    if (s.user_id === expense.paid_by) continue
+    statements.push(
+      DB.prepare(
+        `INSERT INTO balances (id, group_id, user_id, counterpart_id, net_amount_paise, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(group_id, user_id, counterpart_id)
+         DO UPDATE SET net_amount_paise = net_amount_paise + excluded.net_amount_paise, updated_at = excluded.updated_at`
+      ).bind(newId(), expense.group_id, expense.paid_by, s.user_id, s.amount_paise, now)
+    )
+  }
   await DB.batch(statements)
   return c.json({ ok: true })
 })

@@ -11,6 +11,7 @@ const createGroupSchema = z.object({
   icon_bg: z.string().optional(),
   icon_color: z.string().optional(),
   type: z.string().optional(),
+  currency: z.string().length(3).regex(/^[A-Z]+$/).optional(),
 })
 
 const patchGroupSchema = z.object({
@@ -46,7 +47,7 @@ groupRoutes.get('/groups', async (c) => {
   const userId = c.get('userId')
   const { DB } = c.env
   const rows = await DB.prepare(
-    `SELECT g.id, g.name, g.icon, g.icon_bg, g.icon_color, g.type, g.created_by,
+    `SELECT g.id, g.name, g.icon, g.icon_bg, g.icon_color, g.type, g.currency, g.created_by,
             gm.status AS membership_status,
             COALESCE(SUM(CASE WHEN b.user_id = ? THEN b.net_amount_paise ELSE -b.net_amount_paise END), 0) AS net_paise
      FROM groups g
@@ -64,6 +65,7 @@ groupRoutes.get('/groups', async (c) => {
       icon_bg: string | null
       icon_color: string | null
       type: string | null
+      currency: string | null
       created_by: string
       membership_status: string
       net_paise: number
@@ -76,6 +78,7 @@ groupRoutes.get('/groups', async (c) => {
     iconBg: g.icon_bg,
     iconColor: g.icon_color,
     type: g.type,
+    currency: g.currency ?? 'INR',
     createdBy: g.created_by,
     balancePaise: g.net_paise ?? 0,
     memberCount: 0,
@@ -114,8 +117,8 @@ groupRoutes.post('/groups', async (c) => {
 
   await DB.batch([
     DB.prepare(
-      'INSERT INTO groups (id, name, icon, icon_bg, icon_color, type, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(groupId, body.name, body.icon ?? null, body.icon_bg ?? null, body.icon_color ?? null, body.type ?? null, userId, nowIso()),
+      'INSERT INTO groups (id, name, icon, icon_bg, icon_color, type, currency, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(groupId, body.name, body.icon ?? null, body.icon_bg ?? null, body.icon_color ?? null, body.type ?? null, body.currency ?? 'INR', userId, nowIso()),
     DB.prepare(
       "INSERT INTO group_members (id, group_id, user_id, status, joined_at) VALUES (?, ?, ?, 'active', ?)"
     ).bind(memberId, groupId, userId, nowIso()),
@@ -133,7 +136,7 @@ groupRoutes.get('/groups/:id', async (c) => {
   const { DB } = c.env
 
   const group = await DB.prepare(
-    `SELECT g.id, g.name, g.icon, g.icon_bg, g.icon_color, g.type, g.created_by,
+    `SELECT g.id, g.name, g.icon, g.icon_bg, g.icon_color, g.type, g.currency, g.created_by,
             u.name AS created_by_name
      FROM groups g JOIN users u ON u.id = g.created_by
      WHERE g.id = ?`
@@ -146,6 +149,7 @@ groupRoutes.get('/groups/:id', async (c) => {
       icon_bg: string | null
       icon_color: string | null
       type: string | null
+      currency: string | null
       created_by: string
       created_by_name: string
     }>()
@@ -167,6 +171,7 @@ groupRoutes.get('/groups/:id', async (c) => {
       iconBg: group.icon_bg,
       iconColor: group.icon_color,
       type: group.type,
+      currency: group.currency ?? 'INR',
       createdBy: group.created_by,
       createdByName: group.created_by_name,
       members: members.results,

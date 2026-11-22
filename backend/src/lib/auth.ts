@@ -50,6 +50,12 @@ export async function verifyPassword(password: string, stored: string): Promise<
   return constantTimeEqual(actual, expected)
 }
 
+/** One-way hash for reset tokens so only the hash is stored at rest. */
+export async function hashToken(token: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', enc.encode(token))
+  return toBase64url(new Uint8Array(digest))
+}
+
 export function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false
   let diff = 0
@@ -60,6 +66,8 @@ export function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
 export interface JwtPayload {
   sub: string
   email: string
+  /** User's token version — bumped on password change to invalidate sessions. */
+  ver: number
   exp: number
   iat: number
 }
@@ -76,9 +84,15 @@ async function sign(input: string, secret: string): Promise<string> {
   return toBase64url(new Uint8Array(sig))
 }
 
-export async function signToken(payload: { sub: string; email: string }, secret: string, ttlSeconds = 604800): Promise<string> {
+export async function signToken(payload: { sub: string; email: string; ver?: number }, secret: string, ttlSeconds = 604800): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
-  const body: JwtPayload = { sub: payload.sub, email: payload.email, iat: now, exp: now + ttlSeconds }
+  const body: JwtPayload = {
+    sub: payload.sub,
+    email: payload.email,
+    ver: payload.ver ?? 0,
+    iat: now,
+    exp: now + ttlSeconds,
+  }
   const header = toBase64url(enc.encode(JSON.stringify({ alg: 'HS256', typ: 'JWT' })))
   const payloadB64 = toBase64url(enc.encode(JSON.stringify(body)))
   const input = `${header}.${payloadB64}`

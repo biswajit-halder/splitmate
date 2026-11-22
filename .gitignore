@@ -11,9 +11,10 @@ backend/.dev.vars*
 
 
 
-# AI
+# AI / editor tooling
 .omo
 .playwright-mcp
+.serena/
 
 # Debug logs
 *.log

@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { balancesApi } from '../lib/api/balances'
@@ -60,14 +59,7 @@ export function DashboardPage() {
   const balances = useApi(() => balancesApi.all())
   const groups = useApi(() => groupsApi.list())
   const activity = useApi(() => activityApi.list({ limit: 8 }))
-  const sixMonths = useMemo(() => {
-    const now = new Date()
-    return Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    })
-  }, [])
-  const trend = useApi(() => Promise.all(sixMonths.map(m => analyticsApi.monthly(m))), [sixMonths])
+  const trend = useApi(() => analyticsApi.trend(6))
   const firstName = user?.name.split(/\s+/)[0] ?? 'there'
   const openGroups = (balances.data?.groups ?? []).filter(g => g.netPaise !== 0).length
 
@@ -105,19 +97,19 @@ export function DashboardPage() {
         <div>
           <p className="num font-display-lg text-display-lg accent-text glow-coral">{formatMoney(balances.data?.netPaise ?? 0)}</p>
           <p className="eyebrow mt-2">Net position</p>
-          <Sparkline data={trend.data?.map(m => m.totalPaise) ?? []} className="mt-sm h-6 w-28" />
+          <Sparkline data={trend.data?.months.map(m => m.totalPaise) ?? []} className="mt-sm h-6 w-28" />
         </div>
         <div className="hidden h-14 w-px bg-line sm:block" />
         <div>
           <p className="num font-headline-md text-secondary glow-mint">{formatMoney(balances.data?.owedPaise ?? 0)}</p>
           <p className="eyebrow mt-1">Coming to you</p>
-          <Sparkline data={trend.data?.map(m => m.settledPaise) ?? []} color="#5FE0C0" className="mt-sm h-6 w-28" />
+          <Sparkline data={trend.data?.months.map(m => m.settledPaise) ?? []} color="#5FE0C0" className="mt-sm h-6 w-28" />
         </div>
         <div className="hidden h-14 w-px bg-line sm:block" />
         <div>
           <p className="num font-headline-md text-primary glow-coral">{formatMoney(balances.data?.owePaise ?? 0)}</p>
           <p className="eyebrow mt-1">Going out</p>
-          <Sparkline data={trend.data?.map(m => m.totalPaise - m.settledPaise) ?? []} className="mt-sm h-6 w-28" />
+          <Sparkline data={trend.data?.months.map(m => m.totalPaise - m.settledPaise) ?? []} className="mt-sm h-6 w-28" />
         </div>
       </div>
 

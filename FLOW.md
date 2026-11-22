@@ -1,3 +1,7 @@
+> **Historical document.** These diagrams describe the app before the
+> Night Market redesign (group-first canvas, ledger, timeline and settle
+> board). Kept for context only — the current UI is documented in README.md.
+
 # SplitMate — Complete Application Flow
 
 ## 1. Top-Level Navigation & Shell

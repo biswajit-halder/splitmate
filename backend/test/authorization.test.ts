@@ -180,6 +180,40 @@ describe('expense updates', () => {
   })
 })
 
+describe('soft delete and undo', () => {
+  it('hides a deleted expense and restores its balances on undo', async () => {
+    const owner = await authUser('Owner')
+    const bob = await authUser('Bob')
+    const groupId = await makeGroup(owner, [bob])
+    const meBob = await api('/api/users/me', {}, bob.cookie)
+    const bobId = meBob.body.user.id
+    const meOwner = await api('/api/users/me', {}, owner.cookie)
+    const ownerId = meOwner.body.user.id
+
+    const created = await createExpense(groupId, owner.cookie, {
+      description: 'Lunch', amountPaise: 1000, paidBy: ownerId, splitMode: 'equally',
+      participants: [{ userId: ownerId }, { userId: bobId }],
+    })
+    const expenseId = created.body.expense.id
+
+    expect((await api(`/api/expenses/${expenseId}`, {}, owner.cookie)).status).toBe(200)
+    expect((await api(`/api/expenses/${expenseId}`, { method: 'DELETE' }, owner.cookie)).status).toBe(200)
+    expect((await api(`/api/expenses/${expenseId}`, {}, owner.cookie)).status).toBe(404)
+
+    const afterDelete = await api(`/api/groups/${groupId}/balances`, {}, owner.cookie)
+    const map1 = new Map(afterDelete.body.members.map((m: any) => [m.userId, m.netPaise]))
+    expect(map1.get(ownerId)).toBe(0)
+
+    expect((await api(`/api/expenses/${expenseId}/restore`, { method: 'POST' }, owner.cookie)).status).toBe(200)
+    expect((await api(`/api/expenses/${expenseId}`, {}, owner.cookie)).status).toBe(200)
+
+    const afterRestore = await api(`/api/groups/${groupId}/balances`, {}, owner.cookie)
+    const map2 = new Map(afterRestore.body.members.map((m: any) => [m.userId, m.netPaise]))
+    expect(map2.get(ownerId)).toBe(500)
+    expect(map2.get(bobId)).toBe(-500)
+  })
+})
+
 describe('balance reporting', () => {
   it('reports the group balance with the correct sign for both sides', async () => {
     const owner = await authUser('Owner')

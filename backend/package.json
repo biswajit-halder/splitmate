@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "seed:demo": "wrangler d1 execute splitmate-db --local --file=./seed/demo_seed.sql",
-    "seed:generate": "node scripts/generate-demo-seed.mjs"
+    "seed:generate": "node scripts/generate-demo-seed.mjs",
+    "cleanup:demo": "wrangler d1 execute splitmate-db --remote --file=./scripts/cleanup_demo.sql"
   },
   "dependencies": {
     "hono": "^4.13.1"

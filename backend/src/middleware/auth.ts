@@ -30,6 +30,12 @@ async function resolveUserId(c: Context<AppEnv>): Promise<string | null> {
   if (!token) return null
   try {
     const payload = await verifyToken(token, secret)
+    // A password change bumps the user's token version, invalidating all
+    // previously issued sessions immediately.
+    const user = await c.env.DB.prepare('SELECT token_version FROM users WHERE id = ?')
+      .bind(payload.sub)
+      .first<{ token_version: number }>()
+    if (!user || (payload.ver ?? 0) !== (user.token_version ?? 0)) return null
     return payload.sub
   } catch {
     return null

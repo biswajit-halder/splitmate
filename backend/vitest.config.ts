@@ -17,6 +17,7 @@ export default defineConfig({
             // JWT_SECRET is a production secret (never in wrangler.jsonc vars),
             // so the test pool provides its own throwaway value.
             JWT_SECRET: 'test-only-jwt-secret-that-is-long-enough-0123456789',
+            DEV_RESET_TOKEN: 'true',
           },
         },
       }

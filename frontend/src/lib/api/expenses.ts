@@ -28,4 +28,5 @@ export const expensesApi = {
   update: (id: string, body: Partial<CreateExpensePayload>) =>
     http.patch<{ ok: true }>(`/expenses/${id}`, body),
   remove: (id: string) => http.delete<{ ok: true }>(`/expenses/${id}`),
+  restore: (id: string) => http.post<{ ok: true }>(`/expenses/${id}/restore`),
 }

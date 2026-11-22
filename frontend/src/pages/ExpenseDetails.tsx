@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApi, useMutation } from '../hooks/useApi'
 import { expensesApi } from '../lib/api/expenses'
@@ -19,16 +20,29 @@ export function ExpenseDetailsPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const { addToast } = useToast()
-  const { data, loading } = useApi(() => expensesApi.get(id), [id])
+  const { data, loading, refetch } = useApi(() => expensesApi.get(id), [id])
   const remove = useMutation((eid: string) => expensesApi.remove(eid))
+  const restore = useMutation((eid: string) => expensesApi.restore(eid))
+  const [deleted, setDeleted] = useState(false)
 
   const handleDelete = async () => {
     try {
       await remove.mutate(id)
+      setDeleted(true)
       addToast('Expense deleted', 'success')
-      navigate(-1)
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to delete', 'error')
+    }
+  }
+
+  const handleRestore = async () => {
+    try {
+      await restore.mutate(id)
+      setDeleted(false)
+      addToast('Expense restored', 'success')
+      refetch()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to restore', 'error')
     }
   }
 
@@ -47,6 +61,15 @@ export function ExpenseDetailsPage() {
 
   return (
     <div className="flex flex-col gap-xl max-w-content">
+      {deleted && (
+        <div className="tint-coral flex flex-wrap items-center justify-between gap-md rounded-xl px-lg py-md">
+          <p className="font-body-md">This expense was deleted. You can still restore it.</p>
+          <div className="flex gap-sm">
+            <Button variant="secondary" onClick={handleRestore} disabled={restore.loading}>Undo</Button>
+            <Button variant="ghost" onClick={() => navigate(-1)}>Back to group</Button>
+          </div>
+        </div>
+      )}
       <div className="surface-card p-xl">
         <div className="flex items-start justify-between gap-md">
           <div className="flex items-center gap-md">
@@ -69,7 +92,7 @@ export function ExpenseDetailsPage() {
             )}
           </div>
         </div>
-        <p className="num mt-lg font-headline-lg text-headline-lg text-on-surface">{formatMoney(data.amountPaise)}</p>
+        <p className="num mt-lg font-headline-lg text-headline-lg text-on-surface">{formatMoney(data.amountPaise, data.currency)}</p>
       </div>
 
       <div className="surface-card p-xl">
@@ -83,7 +106,7 @@ export function ExpenseDetailsPage() {
                 </div>
                 <span className="font-label-md text-label-md text-on-surface">{s.name}</span>
               </div>
-              <span className="font-label-md text-label-md text-on-surface">{formatMoney(s.amountPaise)}</span>
+              <span className="font-label-md text-label-md text-on-surface">{formatMoney(s.amountPaise, data.currency)}</span>
             </div>
           ))}
         </div>

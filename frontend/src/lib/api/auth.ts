@@ -19,4 +19,8 @@ export const authApi = {
   login: (payload: LoginPayload) => http.post<AuthResult>('/auth/login', payload),
   register: (payload: RegisterPayload) => http.post<AuthResult>('/auth/register', payload),
   logout: () => http.post<{ ok: true }>('/auth/logout'),
+  forgotPassword: (email: string) =>
+    http.post<{ ok: true; devToken?: string }>('/auth/forgot-password', { email }),
+  resetPassword: (token: string, password: string) =>
+    http.post<{ ok: true }>('/auth/reset-password', { token, password }),
 }

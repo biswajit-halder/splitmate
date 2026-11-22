@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { groupsApi } from '../lib/api/groups'
 import { formatMoney } from '../lib/money'
-import { Button, Modal, useToast, EmptyState } from '../components/ui'
+import { Button, Modal, useToast, EmptyState, Select } from '../components/ui'
 import { GroupsSkeleton } from '../components/skeletons/GroupsSkeleton'
 import type { Group } from '../lib/types'
 
@@ -39,6 +39,7 @@ export function GroupsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [name, setName] = useState('')
   const [type, setType] = useState('home')
+  const [currency, setCurrency] = useState('INR')
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
@@ -53,10 +54,11 @@ export function GroupsPage() {
     if (!name.trim()) return
     setCreating(true)
     try {
-      await groupsApi.create({ name: name.trim(), type })
+      await groupsApi.create({ name: name.trim(), type, currency })
       setShowCreateModal(false)
       setName('')
       setType('home')
+      setCurrency('INR')
       refetch()
       addToast('Group created', 'success')
     } catch {
@@ -137,7 +139,7 @@ export function GroupsPage() {
                 <div className="mt-sm flex items-end justify-between gap-sm">
                   <div>
                     <p className="text-[11px] opacity-75">{group.memberCount} people</p>
-                    <p className="num mt-1 font-headline-sm">{formatMoney(balance)}</p>
+                    <p className="num mt-1 font-headline-sm">{formatMoney(balance, group.currency ?? 'INR')}</p>
                   </div>
                   <div className="flex -space-x-2">
                     {(group.members ?? []).slice(0, 4).map((m, i) => (
@@ -186,6 +188,14 @@ export function GroupsPage() {
                 </button>
               ))}
             </div>
+          </div>
+          <div className="flex flex-col gap-xs">
+            <p className="micro-label">Currency</p>
+            <Select
+              value={currency}
+              onChange={setCurrency}
+              options={['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD', 'AUD'].map(c => ({ value: c, label: c }))}
+            />
           </div>
           <div className="flex justify-end gap-md">
             <Button variant="secondary" type="button" onClick={() => setShowCreateModal(false)}>Cancel</Button>

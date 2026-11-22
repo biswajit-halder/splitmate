@@ -95,6 +95,13 @@ The frontend and API are served from different `workers.dev` subdomains, which
 are cross-site, so production requires `COOKIE_SECURE=true` and
 `COOKIE_SAMESITE=None` for the session cookie to be sent.
 
+Optional secrets for email delivery (password resets and daily settlement
+reminders): `EMAIL_WEBHOOK_URL` and `EMAIL_WEBHOOK_TOKEN`. The webhook receives
+`{ to, subject, text }`. Without a webhook, resets are unavailable in
+production; set `DEV_RESET_TOKEN=true` locally to return the token in the API
+response instead. A daily cron (`0 9 * * *`) reminds payees about settlements
+pending for more than 24 hours.
+
 ## Production hardening notes
 
 - The in-process rate limiter (`backend/src/middleware/rateLimit.ts`) is
@@ -103,9 +110,16 @@ are cross-site, so production requires `COOKIE_SECURE=true` and
 - `JWT_SECRET` must be set before deploying; the API returns `CONFIG_ERROR`
   and serves no traffic while it is missing.
 - Demo accounts exist only in `backend/seed/demo_seed.sql` and are never
-  applied by a migration. If demo data was seeded into a production database
-  earlier, remove it with:
-  `npx wrangler d1 execute splitmate-db --remote --command "DELETE FROM users WHERE email LIKE 'demo%@splitmate.app'"`
+  applied by a migration. If demo data was seeded into a production database,
+  remove it with `cd backend && npm run cleanup:demo` (review
+  `scripts/cleanup_demo.sql` first — it deletes everything owned by those users).
+- State-changing requests are protected by an Origin check in addition to
+  SameSite cookies. For real abuse protection, add Cloudflare rate-limiting
+  rules for `/api/auth/*` and `/api/*` in the dashboard.
+- Passwords changes and resets bump the user's `token_version`, invalidating
+  every previously issued session.
+- Schedule D1 exports/backups and enable Cloudflare health checks for
+  `/api/health`; there is no automated restore path in this repo.
 
 ## Testing
 
@@ -125,11 +139,15 @@ type-checks and builds the frontend on every push and PR to `main`.
 ## Deployment
 
 ```bash
-# Backend (set the secret first, then deploy)
+# Backend (set the secrets first, then deploy)
 cd backend
 npx wrangler secret put JWT_SECRET
+# optional: npx wrangler secret put EMAIL_WEBHOOK_URL
 npx wrangler d1 migrations apply splitmate-db --remote
 npm run deploy
+
+# Or trigger the manual "Deploy API to Cloudflare" GitHub workflow
+# (runs typecheck + tests before deploying).
 
 # Frontend
 cd frontend
@@ -154,4 +172,5 @@ npx wrangler deploy
 
 ## License
 
-Private
+All rights reserved. No license has been granted — the source is public for
+reference only.

@@ -22,6 +22,7 @@ export interface Group {
   iconBg: string | null
   iconColor: string | null
   type: string | null
+  currency: string
   createdBy: string
   balancePaise: number
   memberCount: number
@@ -44,6 +45,7 @@ export interface GroupDetail {
   iconBg: string | null
   iconColor: string | null
   type: string | null
+  currency: string
   createdBy: string
   createdByName: string
   members: GroupMember[]
@@ -99,6 +101,7 @@ export interface ExpenseDetail {
   splitMode: string
   paidBy: string
   paidByName: string
+  currency: string
   createdAt: string
   /** True when the current user may edit/delete the expense (payer or group owner). */
   canEdit: boolean

@@ -7,6 +7,7 @@ export interface CreateGroupPayload {
   icon_bg?: string
   icon_color?: string
   type?: string
+  currency?: string
 }
 
 export const groupsApi = {

@@ -1,0 +1,39 @@
+name: Deploy API to Cloudflare
+
+# Manual so a passing CI run is required first and migrations stay deliberate.
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'What is being deployed?'
+        required: false
+        default: 'Manual backend deploy'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Deploy Worker
+        run: npm run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

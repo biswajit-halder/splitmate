@@ -1,9 +1,12 @@
+import type { ExecutionContext, ScheduledController } from '@cloudflare/workers-types'
 import { Hono } from 'hono'
 import { logger } from 'hono/logger'
 import { secureHeaders } from 'hono/secure-headers'
 import { AppError } from './errors/AppError'
+import { sendEmail } from './lib/email'
 import { apiRateLimit } from './middleware/rateLimit'
 import { corsMiddleware } from './middleware/cors'
+import { originGuard } from './middleware/origin'
 import { errorHandler } from './middleware/errorHandler'
 import { activityRoutes } from './routes/activity'
 import { analyticsRoutes } from './routes/analytics'
@@ -43,6 +46,7 @@ app.use('*', async (c, next) => {
 app.use('*', logger())
 app.use('*', secureHeaders())
 app.use('*', corsMiddleware)
+app.use('/api/*', originGuard)
 app.use('/api/*', (c, next) => {
   if (c.req.path.startsWith('/api/auth')) return next()
   return apiRateLimit(c, next)
@@ -61,5 +65,35 @@ app.route('/api', settlementRoutes)
 app.route('/api', activityRoutes)
 app.route('/api', notificationRoutes)
 app.route('/api', analyticsRoutes)
+
+/**
+ * Daily reminder for settlements that have been pending for over a day.
+ * Enabled by adding a cron trigger in wrangler.jsonc; no-ops without an
+ * email webhook configured.
+ */
+export const scheduled = async (
+  _controller: ScheduledController,
+  env: Bindings,
+  _ctx: ExecutionContext
+): Promise<void> => {
+  if (!env.DB || !env.EMAIL_WEBHOOK_URL) return
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const pending = await env.DB.prepare(
+    `SELECT s.id, s.amount_paise, u.email
+     FROM settlements s JOIN users u ON u.id = s.payee_id
+     WHERE s.status = 'pending' AND s.created_at < ?`
+  )
+    .bind(cutoff)
+    .all<{ id: string; amount_paise: number; email: string }>()
+
+  for (const settlement of pending.results) {
+    await sendEmail(
+      env,
+      settlement.email,
+      'Settlement awaiting confirmation',
+      `A payment of ${settlement.amount_paise / 100} INR is waiting for your confirmation in SplitMate.`
+    )
+  }
+}
 
 export default app

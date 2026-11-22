@@ -72,7 +72,9 @@ userRoutes.post('/me/email', loginRateLimit, async (c) => {
   const taken = await DB.prepare('SELECT id FROM users WHERE email = ? AND id != ?').bind(email, userId).first()
   if (taken) throw new ConflictError('Email is already in use')
 
-  await DB.prepare('UPDATE users SET email = ?, updated_at = ? WHERE id = ?').bind(email, nowIso(), userId).run()
+  await DB.prepare('UPDATE users SET email = ?, updated_at = ? WHERE id = ?')
+    .bind(email, nowIso(), userId)
+    .run()
   return c.json({ user: { id: row.id, email } })
 })
 
@@ -91,7 +93,8 @@ userRoutes.post('/me/password', loginRateLimit, async (c) => {
   }
 
   const passwordHash = await hashPassword(body.newPassword)
-  await DB.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?')
+  // Bump the version so every previously issued token stops working.
+  await DB.prepare('UPDATE users SET password_hash = ?, token_version = token_version + 1, updated_at = ? WHERE id = ?')
     .bind(passwordHash, nowIso(), userId)
     .run()
   return c.json({ user: { id: row.id } })

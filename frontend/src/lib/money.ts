@@ -1,27 +1,40 @@
-const inr = new Intl.NumberFormat('en-IN', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
+const SYMBOLS: Record<string, string> = {
+  INR: '₹', USD: '$', EUR: '€', GBP: '£', AED: 'د.إ', SGD: 'S$', AUD: 'A$',
+}
+
+const formatters = new Map<string, Intl.NumberFormat>()
+function formatter(currency: string): Intl.NumberFormat {
+  let f = formatters.get(currency)
+  if (!f) {
+    f = new Intl.NumberFormat(currency === 'INR' ? 'en-IN' : 'en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+    formatters.set(currency, f)
+  }
+  return f
+}
 
 /** ₹1,234.50 — negative amounts put the minus before the symbol. */
-export function formatMoney(paise: number): string {
+export function formatMoney(paise: number, currency = 'INR'): string {
   const sign = paise < 0 ? '-' : ''
-  return `${sign}₹${inr.format(Math.abs(paise) / 100)}`
+  return `${sign}${SYMBOLS[currency] ?? `${currency} `}${formatter(currency).format(Math.abs(paise) / 100)}`
 }
 
 /** +₹1,234.50 / -₹1,234.50 — for balances that need an explicit direction. */
-export function formatSigned(paise: number): string {
+export function formatSigned(paise: number, currency = 'INR'): string {
   const sign = paise > 0 ? '+' : paise < 0 ? '-' : ''
-  return `${sign}₹${inr.format(Math.abs(paise) / 100)}`
+  return `${sign}${formatMoney(Math.abs(paise), currency)}`
 }
 
 /** Compact form for dense views: ₹1.2k / ₹12.4k. */
-export function formatMoneyCompact(paise: number): string {
-  const rupees = Math.abs(paise) / 100
+export function formatMoneyCompact(paise: number, currency = 'INR'): string {
+  const amount = Math.abs(paise) / 100
   const sign = paise < 0 ? '-' : ''
-  if (rupees >= 100000) return `${sign}₹${(rupees / 100000).toFixed(1)}L`
-  if (rupees >= 1000) return `${sign}₹${(rupees / 1000).toFixed(1)}k`
-  return formatMoney(paise)
+  const symbol = SYMBOLS[currency] ?? `${currency} `
+  if (amount >= 100000) return `${sign}${symbol}${(amount / 100000).toFixed(1)}L`
+  if (amount >= 1000) return `${sign}${symbol}${(amount / 1000).toFixed(1)}k`
+  return formatMoney(paise, currency)
 }
 
 /** Convert integer paise back to a rupee string for form inputs. */

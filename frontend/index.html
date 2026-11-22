@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1B1325" />
     <meta name="description" content="SplitMate — share expenses, settle up, stay friends." />
@@ -23,6 +24,9 @@
         } else {
           document.documentElement.classList.add('dark');
         }
+        // Apply the saved accent before paint to avoid a flash of Ember.
+        var a = localStorage.getItem('splitmate-accent');
+        if (a === 'violet' || a === 'mint') document.documentElement.dataset.accent = a;
       })();
     </script>
     <div id="root" style="overflow-x: hidden; width: 100%;"></div>

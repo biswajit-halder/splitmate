@@ -33,6 +33,7 @@ export function GroupDetailPage() {
     [id, group.data?.name],
   )
   const balances = useApi(() => balancesApi.group(id), [id])
+  const simplified = useApi(() => balancesApi.simplify(id), [id])
 
   const [settleOpen, setSettleOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -103,6 +104,7 @@ export function GroupDetailPage() {
 
   const g = group.data
   const isOwner = g.createdBy === user?.id
+  const currency = g.currency ?? 'INR'
 
   return (
     <div className="flex flex-col">
@@ -148,7 +150,7 @@ export function GroupDetailPage() {
                     {exp.paidByName}{exp.paidBy === user?.id ? ' (you)' : ''} · {formatDateCompact(exp.expenseDate)} · {exp.splitMode}
                   </p>
                 </button>
-                <span className="num font-label-md text-on-surface">{formatMoney(exp.amountPaise)}</span>
+                <span className="num font-label-md text-on-surface">{formatMoney(exp.amountPaise, currency)}</span>
                 {exp.canEdit && (
                   <button
                     onClick={() => handleDelete(exp.id)}
@@ -178,7 +180,7 @@ export function GroupDetailPage() {
                       <p className="font-body-sm text-on-surface-variant">{formatDateTime(s.date)}</p>
                     </div>
                     <Badge variant={s.status === 'completed' ? 'success' : 'warning'} className="capitalize">{s.status}</Badge>
-                    <span className="num font-label-md text-secondary">{formatMoney(s.amountPaise)}</span>
+                    <span className="num font-label-md text-secondary">{formatMoney(s.amountPaise, currency)}</span>
                   </div>
                 ))}
               </div>
@@ -203,7 +205,7 @@ export function GroupDetailPage() {
                     <p className="font-body-sm text-on-surface-variant">{owed ? 'owed to them' : m.netPaise < 0 ? 'they owe' : 'settled'}</p>
                   </div>
                   <span className={`num font-label-md ${owed ? 'text-secondary glow-mint' : m.netPaise < 0 ? 'text-primary glow-coral' : 'text-on-surface-variant'}`}>
-                    {formatMoney(Math.abs(m.netPaise))}
+                    {formatMoney(Math.abs(m.netPaise), currency)}
                   </span>
                   {isOwner && m.userId !== user?.id && (
                     <button
@@ -230,6 +232,21 @@ export function GroupDetailPage() {
           >
             <span className="material-symbols-outlined text-[18px]">payments</span> Settle up
           </Button>
+          {(simplified.data?.transactions.length ?? 0) > 0 && (
+            <div className="mt-xl border-t border-line pt-lg">
+              <p className="micro-label mb-sm">Fewest payments to settle everyone</p>
+              <div className="flex flex-col gap-1">
+                {simplified.data!.transactions.map((t, i) => (
+                  <div key={i} className="flex items-center justify-between gap-sm py-1 font-body-sm">
+                    <span className="text-on-surface-variant">
+                      {members.find(m => m.userId === t.from)?.name ?? 'Member'} → {members.find(m => m.userId === t.to)?.name ?? 'Member'}
+                    </span>
+                    <span className="num text-secondary">{formatMoney(t.amountPaise, currency)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {!isOwner && (
             <button
               onClick={() => ask('Leave this group? Balances must be settled first.', async () => {
